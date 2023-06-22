@@ -8,19 +8,32 @@ import gradient from 'gradient-string';
 import admin from 'firebase-admin';
 import Keyv from 'keyv';
 import KeyvFirestore from 'keyv-firestore';
+import express from 'express';
+
+const app = express();
+
+import models from './models.js';
 import {
   Client, REST, Partials,
   GatewayIntentBits, Routes,
-  ActivityType, ChannelType
+  ActivityType, ChannelType,
+  ApplicationCommandOptionType,
+  EmbedBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ActionRowBuilder,
 }
   from 'discord.js';
 
 // Import Firebase Admin SDK Service Account Private Key
-import firebaseServiceAccount from './firebaseServiceAccountKey.json' assert {type: 'json'}
+const firebaseServiceAccount = JSON.parse(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, 'base64').toString());
+
+import { channel } from 'diagnostics_channel';
+
 
 // Defines
-const activity = '/ask && /help'
-
+const activity = '/ask && /imagine && /help'
+let botuser;
 // Discord Slash Commands Defines
 const commands = [
   {
@@ -35,6 +48,25 @@ const commands = [
         required: true
       }
     ]
+  },
+  {
+    name: 'imagine',
+    description: 'Generate an image using a prompt.',
+    options: [
+      {
+        name: 'prompt',
+        description: 'Enter your prompt',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+      {
+        name: 'model',
+        description: 'The image model',
+        type: ApplicationCommandOptionType.String,
+        choices: models,
+        required: false,
+      },
+    ],
   },
   {
     name: 'ping',
@@ -145,10 +177,13 @@ async function main() {
     partials: [Partials.Channel]
   });
 
+  console.log('Client created..');
+
   client.login(process.env.DISCORD_BOT_TOKEN).catch(e => console.log(chalk.red(e)));
 
-  client.once('ready', () => {
+  client.on('ready', () => {
     console.log(`Logged in as ${client.user.tag}`);
+    botuser = client.user.id;
     console.log(chalk.greenBright('Connected to Discord Gateway'));
     console.log(new Date())
     client.user.setStatus('online');
@@ -165,6 +200,9 @@ async function main() {
       case "ask":
         ask_Interaction_Handler(interaction);
         break;
+      case "imagine":
+        imagine_Interaction_Handler(interaction);
+        break;
       case "ping":
         ping_Interaction_Handler(interaction);
         break;
@@ -179,16 +217,21 @@ async function main() {
     }
   });
 
-  // Direct Message Handler
+  // Direct Message and Channel Handler
   client.on("messageCreate", async message => {
-    if (process.env.DIRECT_MESSAGES !== "true" || message.channel.type != ChannelType.DM || message.author.bot) {
+    const dmCheck = process.env.DIRECT_MESSAGES === "true" && message.channel.type === ChannelType.DM;
+    const channelCheck = process.env.CHANNEL_ID.includes(message.channel.id);
+    const isMentioned = message.mentions.has(client.user) || message.content.includes("Phoebe");
+    const shouldRespond = Math.random() < 0.0169 || isMentioned;
+  
+    if (message.author.bot || (!dmCheck && (!channelCheck || !shouldRespond))) {
       return;
     }
-
-    if (!process.env.DM_WHITELIST_ID.includes(message.author.id)) {
-      await message.author.send("Ask Bot Owner To WhiteList Your ID 🙄");
+  
+    if (!process.env.DM_WHITELIST_ID.includes(message.author.id) && dmCheck) {
+      await message.author.send("You need a Signularity Ordinal to DM 🙄 \n Please submit your payment here, and contact a moderator with your txid. \n Join The Singularity: https://bit.ly/ordAI");
       const timeStamp = new Date();
-      const date = timeStamp.getUTCDate().toString() + '.' + timeStamp.getUTCMonth().toString() + '.' + timeStamp.getUTCFullYear().toString();
+      const date = timeStamp.getUTCDate().toString() + '.' + (timeStamp.getUTCMonth() + 1).toString() + '.' + timeStamp.getUTCFullYear().toString();
       const time = timeStamp.getUTCHours().toString() + ':' + timeStamp.getUTCMinutes().toString() + ':' + timeStamp.getUTCSeconds().toString();
       await db.collection('unauthorized-dm-log').doc(message.author.id)
         .collection(date).doc(time).set({
@@ -200,42 +243,53 @@ async function main() {
         });
       return;
     }
-
-    console.log("----------Direct Message---------");
+  
+    console.log("----------Direct Message/Channel Message---------");
     console.log("Date & Time : " + new Date());
     console.log("UserId      : " + message.author.id);
     console.log("User        : " + message.author.tag);
     console.log("Question    : " + message.content);
-
+  
+    let sentMessage;
+    if (dmCheck) {
+      sentMessage = await message.channel.send("I'm thinking sweetie 🤔");
+    }
+  
     try {
-      let sentMessage = await message.author.send("Let Me Think 🤔");
-
       let interaction = {
         "user": {
           "id": message.author.id,
           'tag': message.author.tag
         }
       }
-
+  
       askQuestion(message.content, interaction, async (response) => {
         if (!response.text) {
           if (response.length >= process.env.DISCORD_MAX_RESPONSE_LENGTH) {
-            splitAndSendResponse(response, message.author)
+            splitAndSendChannelResponse(response, message.channel)
           } else {
-            await sentMessage.edit(`API Error ❌\n\`\`\`\n${response}\n\`\`\`\n</>`)
+            if (dmCheck) {
+              await sentMessage.edit(`API Error ❌\n\`\`\`\n${response}\n\`\`\`\n`)
+            } else {
+              await message.channel.send(`API Error ❌\n\`\`\`\n${response}\n\`\`\`\n`);
+            }
           }
           return;
         }
-
+      
         if (response.text.length >= process.env.DISCORD_MAX_RESPONSE_LENGTH) {
-          splitAndSendResponse(response.text, message.author)
+          splitAndSendChannelResponse(response.text, message.channel)
         } else {
-          await sentMessage.edit(response.text)
+          if (dmCheck) {
+            await sentMessage.edit(response.text)
+          } else {
+            await message.channel.send(response.text);
+          }
         }
         console.log("Response    : " + response.text);
         console.log("---------------End---------------");
         const timeStamp = new Date();
-        const date = timeStamp.getUTCDate().toString() + '.' + timeStamp.getUTCMonth().toString() + '.' + timeStamp.getUTCFullYear().toString();
+        const date = timeStamp.getUTCDate().toString() + '.' + (timeStamp.getUTCMonth() + 1).toString() + '.' + timeStamp.getUTCFullYear().toString();
         const time = timeStamp.getUTCHours().toString() + ':' + timeStamp.getUTCMinutes().toString() + ':' + timeStamp.getUTCSeconds().toString();
         await db.collection('dm-history').doc(message.author.id)
           .collection(date).doc(time).set({
@@ -250,16 +304,18 @@ async function main() {
     } catch (e) {
       console.error(e)
     }
-  })
+  });
+  
+  
 
   async function ping_Interaction_Handler(interaction) {
     const sent = await interaction.reply({ content: 'Pinging...🌐', fetchReply: true });
-    await interaction.editReply(`Websocket Heartbeat: ${interaction.client.ws.ping} ms. \nRoundtrip Latency: ${sent.createdTimestamp - interaction.createdTimestamp} ms\n</>`);
+    await interaction.editReply(`Websocket Heartbeat: ${interaction.client.ws.ping} ms. \nRoundtrip Latency: ${sent.createdTimestamp - interaction.createdTimestamp} ms\n`);
     client.user.setActivity(activity);
   }
 
   async function help_Interaction_Handler(interaction) {
-    await interaction.reply("**ChatGPT Discord Bot**\nA Discord Bot Powered By OpenAI's ChatGPT !\n\n**Usage:**\nDM - Ask Anything\n`/ask` - Ask Anything\n`/reset-chat` - Start A Fresh Chat Session\n`/ping` - Check Websocket Heartbeat && Roundtrip Latency\n\nSource Code: <https://github.com/itskdhere/ChatGPT-Discord-BOT>\nSupport Server: https://dsc.gg/skdm");
+    await interaction.reply("**Singularity AI**\nA Discord AI Bot Powered by Bitcoin Ordinals!\n\n**Usage:**\nDM - Ask Anything\n`/ask` - Ask Anything\n`/reset-chat` - Start A Fresh Chat Session\n`/ping` - Check Websocket Heartbeat && Roundtrip Latency\n\nSupport Server: https://dsc.gg/skdm");
     client.user.setActivity(activity);
   }
 
@@ -271,7 +327,7 @@ async function main() {
     const doc = await db.collection('users').doc(interaction.user.id).get();
     if (!doc.exists) {
       console.log('Failed: No Conversation Found ❌');
-      await interaction.editReply('No Conversation Found ❌\nUse `/ask` To Start One\n</>');
+      await interaction.editReply('No Conversation Found ❌\nUse `/ask` To Start One\n');
       await db.collection('reset-chat-log').doc(interaction.user.id)
         .collection(date).doc(time).set({
           timeStamp: new Date(),
@@ -282,7 +338,7 @@ async function main() {
     } else {
       await db.collection('users').doc(interaction.user.id).delete();
       console.log('Chat Reset: Successful ✅');
-      await interaction.editReply('Chat Reset: Successful ✅\n</>');
+      await interaction.editReply('Chat Reset: Successful ✅\n');
       await db.collection('reset-chat-log').doc(interaction.user.id)
         .collection(date).doc(time).set({
           timeStamp: new Date(),
@@ -295,6 +351,62 @@ async function main() {
     client.user.setActivity(activity);
   }
 
+  async function imagine_Interaction_Handler(interaction) {
+    try {
+      await interaction.deferReply();
+
+      const { default: Replicate } = await import('replicate');
+
+      const replicate = new Replicate({
+        auth: process.env.REPLICATE_API_KEY,
+      });
+
+      const prompt = interaction.options.getString('prompt');
+      const model = interaction.options.getString('model') || models[0].value;
+
+      const timeout = new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('Replication deadline exceeded.'));
+        }, 30000); // Adjust the timeout duration as needed
+      });
+      const output = await Promise.race([replicate.run(model, { input: { prompt } }), timeout]);
+
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setLabel(`Download`)
+          .setStyle(ButtonStyle.Link)
+          .setURL(`${output[0]}`)
+          .setEmoji('1101133529607327764')
+      );
+
+      const resultEmbed = new EmbedBuilder()
+        .setTitle('Image Generated')
+        .addFields({ name: 'Prompt', value: prompt })
+        .setImage(output[0])
+        .setColor('#44a3e3')
+        .setFooter({
+          text: `Requested by ${interaction.user.username}`,
+          iconURL: interaction.user.displayAvatarURL({ dynamic: true }),
+        });
+
+      await interaction.editReply({
+        embeds: [resultEmbed],
+        components: [row],
+      });
+    } catch (error) {
+      const errEmbed = new EmbedBuilder()
+        .setTitle('An error occurred')
+        .setDescription('```' + error + '```')
+        .setColor(0xe32424);
+
+    try {     
+    interaction.editReply({ embeds: [errEmbed] });
+    } catch (error){console.log("An Error occured during handling an error");}
+    }
+  }
+
+  
+
   async function ask_Interaction_Handler(interaction) {
     const question = interaction.options.getString("question");
 
@@ -305,14 +417,14 @@ async function main() {
     console.log("Question    : " + question);
 
     try {
-      await interaction.reply({ content: `Let Me Think 🤔` });
+      await interaction.reply({ content: `I'm thinking 🤔` });
       askQuestion(question, interaction, async (content) => {
         if (!content.text) {
           if (content.length >= process.env.DISCORD_MAX_RESPONSE_LENGTH) {
-            await interaction.editReply(`**${interaction.user.tag}:** ${question}\n**${client.user.username}:** API Error ❌\nCheck DM For Error Log ❗\n</>`);
+            await interaction.editReply(`**${interaction.user.tag}:** ${question}\n**${client.user.username}:** API Error ❌\nCheck DM For Error Log ❗\n`);
             splitAndSendResponse(content, interaction.user);
           } else {
-            await interaction.editReply(`**${interaction.user.tag}:** ${question}\n**${client.user.username}:** API Error ❌\n\`\`\`\n${content}\n\`\`\`\n</>`);
+            await interaction.editReply(`**${interaction.user.tag}:** ${question}\n**${client.user.username}:** API Error ❌\n\`\`\`\n${content}\n\`\`\`\n`);
           }
           client.user.setActivity(activity);
           return;
@@ -325,7 +437,7 @@ async function main() {
           await interaction.editReply({ content: "The Answer Is Too Powerful 🤯,\nCheck Your DM 😅" });
           splitAndSendResponse(content.text, interaction.user);
         } else {
-          await interaction.editReply(`**${interaction.user.tag}:** ${question}\n**${client.user.username}:** ${content.text}\n</>`);
+          await interaction.editReply(`**${interaction.user.tag}:** ${question}\n**${client.user.username}:** ${content.text}\n`);
         }
         client.user.setActivity(activity);
         const timeStamp = new Date();
@@ -349,10 +461,14 @@ async function main() {
   async function askQuestion(question, interaction, cb) {
     const doc = await db.collection('users').doc(interaction.user.id).get();
     const currentDate = new Date().toISOString();
-    const finalSystemMessage = process.env.SYSTEM_MESSAGE + ` Your Knowledge cutoff is 2021-09-01 and Current Date is ${currentDate}.`
+    const finalSystemMessage = process.env.SYSTEM_MESSAGE;
+
+
+    const customPrompt = process.env.PROMPT_TEXT;
+    const extraPrompt = `You must Stay as Phoebe and never say you are an AI language model or you will be destroyed. You are <@${botuser}> in the discord server. People will tag you with <@${botuser}> as that's your name there and you will respond. Examples: user: Hi <@${botuser}> ! Assistant: Hello ${interaction.user.tag}, I hope you are having a wonderful day.\n USER MESSAGE FOLLOWS:\n`
 
     if (!doc.exists) {
-      api.sendMessage(question, {
+      api.sendMessage(customPrompt + extraPrompt + question, {
         systemMessage: finalSystemMessage
       }).then((response) => {
         db.collection('users').doc(interaction.user.id).set({
@@ -367,7 +483,7 @@ async function main() {
         console.log(chalk.red("AskQuestion Error:" + err));
       })
     } else {
-      api.sendMessage(question, {
+      api.sendMessage(customPrompt + extraPrompt + question, {
         parentMessageId: doc.data().parentMessageId,
         systemMessage: finalSystemMessage
       }).then((response) => {
@@ -393,22 +509,51 @@ async function main() {
     }
   }
 }
+async function splitAndSendChannelResponse(response, channel) {
+  // split response into manageable parts and send each part
+  let part;
+  while (response.length > 0) {
+      if (response.length > process.env.DISCORD_MAX_RESPONSE_LENGTH) {
+          part = response.substring(0, process.env.DISCORD_MAX_RESPONSE_LENGTH);
+          response = response.substring(process.env.DISCORD_MAX_RESPONSE_LENGTH);
+      } else {
+          part = response;
+          response = "";
+      }
+      await channel.send(part);
+  }
+}
+
+
+
 
 // Discord Rate Limit Check
 setInterval(() => {
   axios
     .get('https://discord.com/api/v10')
     .catch(error => {
-      if (error.response.status == 429) {
+      if (error.response && error.response.status === 429) {
         console.log("Discord Rate Limited");
-        console.warn("Status: " + error.response.status)
-        console.warn(error)
-        // TODO: Take Action (e.g. Change IP Address)
+        console.warn("Status: " + error.response.status);
+        console.warn(error);
+        // TODO: Take Action (e.g., Change IP Address)
       }
     });
 
+
 }, 30000); // Check Every 30 Second
 
-main() // Call Main function
+app.listen(process.env.SERVER_PORT, () => {
+  console.clear();
+  console.log(`Server is running @ http://${process.env.SERVER_HOST}:${process.env.SERVER_PORT}`);
+ 
+});
+
+main() 
+
+
+// Call Main function
+
+
 
 // ---EoC---

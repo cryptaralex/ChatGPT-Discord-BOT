@@ -17,10 +17,6 @@ const models = [
   {
     name: 'AI Forever',
     value: 'ai-forever/kandinsky-2:601eea49d49003e6ea75a11527209c4f510a93e2112c969d548fbb45b9c4f19f',
-  },
-  {
-    name: 'Mini DALL-E',
-    value: 'kuprel/min-dalle:2af375da21c5b824a84e1c459f45b69a117ec8649c2aa974112d7cf1840fc0ce',
   }
   
 ];

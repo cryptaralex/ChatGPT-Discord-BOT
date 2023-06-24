@@ -291,7 +291,7 @@ async function main() {
           
         
           try {
-            const regex = /![Image][([^[]]*?)(?=\s|]])/
+            const regex = /!\[Image\]\[([^[\]\s]*?)/;
             const prompt = 'midjrny-v4 style,' + response.text.match(regex)[1];
           
             console.log(prompt);

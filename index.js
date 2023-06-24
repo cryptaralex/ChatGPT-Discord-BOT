@@ -197,9 +197,9 @@ async function main() {
     client.user.setActivity(interaction.user.tag, { type: ActivityType.Watching });
 
     switch (interaction.commandName) {
-      case "ask":
-        ask_Interaction_Handler(interaction);
-        break;
+    //  case "ask":
+    //    ask_Interaction_Handler(interaction);
+    //    break;
       case "imagine":
         imagine_Interaction_Handler(interaction);
         break;
@@ -221,7 +221,7 @@ async function main() {
   client.on("messageCreate", async message => {
     const dmCheck = process.env.DIRECT_MESSAGES === "true" && message.channel.type === ChannelType.DM;
     const channelCheck = process.env.CHANNEL_ID.includes(message.channel.id);
-    const isMentioned = message.mentions.has(client.user) || message.content.includes("Phoebe");
+    const isMentioned = message.mentions.has(client.user) || message.content.toLowerCase().includes(process.env.BOT_NAME.toLowerCase());
     const shouldRespond = Math.random() < 0.0169 || isMentioned;
   
     if (message.author.bot || (!dmCheck && (!channelCheck || !shouldRespond))) {
@@ -286,6 +286,46 @@ async function main() {
             await message.channel.send(response.text);
           }
         }
+        if(response.text.includes('![Image]')){
+
+          
+        
+          try {
+            const regex = /![Image][([^[]]*?)(?=\s|]])/
+            const prompt = 'midjrny-v4 style,' + response.text.match(regex)[1];
+          
+            console.log(prompt);
+      
+            const { default: Replicate } = await import('replicate');
+      
+            const replicate = new Replicate({
+              auth: process.env.REPLICATE_API_KEY,
+            });
+      
+        
+            const model = models[0].value;
+      
+            const timeout = new Promise((_, reject) => {
+              setTimeout(() => {
+                reject(new Error('Replication deadline exceeded.'));
+              }, 90000); // Adjust the timeout duration as needed
+            });
+            const output = await Promise.race([replicate.run(model, { input: { prompt } }), timeout]);
+            await message.channel.send(output[0]);
+           //console.log("output would be here");
+          }catch(error){
+            console.log(error);
+          }      
+
+
+
+
+
+          console.log("found the image tag in the response");
+        }
+      
+
+
         console.log("Response    : " + response.text);
         console.log("---------------End---------------");
         const timeStamp = new Date();
@@ -315,7 +355,7 @@ async function main() {
   }
 
   async function help_Interaction_Handler(interaction) {
-    await interaction.reply("**Singularity AI**\nA Discord AI Bot Powered by Bitcoin Ordinals!\n\n**Usage:**\nDM - Ask Anything\n`/ask` - Ask Anything\n`/reset-chat` - Start A Fresh Chat Session\n`/ping` - Check Websocket Heartbeat && Roundtrip Latency\n\nSupport Server: https://dsc.gg/skdm");
+    await interaction.reply("**Singularity AI**\nA Discord AI Bot Powered by Bitcoin Ordinals!\n\n**Usage:**\nDM - Ask Anything\n`/ask` - Ask Anything\n`/reset-chat` - Start A Fresh Chat Session\n`/ping` - Check Websocket Heartbeat && Roundtrip Latency\n\nSupport Server: https://discord.gg/btcai");
     client.user.setActivity(activity);
   }
 
@@ -367,7 +407,7 @@ async function main() {
       const timeout = new Promise((_, reject) => {
         setTimeout(() => {
           reject(new Error('Replication deadline exceeded.'));
-        }, 30000); // Adjust the timeout duration as needed
+        }, 90000); // Adjust the timeout duration as needed
       });
       const output = await Promise.race([replicate.run(model, { input: { prompt } }), timeout]);
 
@@ -407,22 +447,22 @@ async function main() {
 
   
 
-  async function ask_Interaction_Handler(interaction) {
+   async function ask_Interaction_Handler(interaction) {
     const question = interaction.options.getString("question");
 
     console.log("----------Channel Message--------");
-    console.log("Date & Time : " + new Date());
+   console.log("Date & Time : " + new Date());
     console.log("UserId      : " + interaction.user.id);
-    console.log("User        : " + interaction.user.tag);
+   console.log("User        : " + interaction.user.tag);
     console.log("Question    : " + question);
 
     try {
       await interaction.reply({ content: `I'm thinking 🤔` });
       askQuestion(question, interaction, async (content) => {
         if (!content.text) {
-          if (content.length >= process.env.DISCORD_MAX_RESPONSE_LENGTH) {
-            await interaction.editReply(`**${interaction.user.tag}:** ${question}\n**${client.user.username}:** API Error ❌\nCheck DM For Error Log ❗\n`);
-            splitAndSendResponse(content, interaction.user);
+           if (content.length >= process.env.DISCORD_MAX_RESPONSE_LENGTH) {
+           await interaction.editReply(`**${interaction.user.tag}:** ${question}\n**${client.user.username}:** API Error ❌\nCheck DM For Error Log ❗\n`);
+           splitAndSendResponse(content, interaction.user);
           } else {
             await interaction.editReply(`**${interaction.user.tag}:** ${question}\n**${client.user.username}:** API Error ❌\n\`\`\`\n${content}\n\`\`\`\n`);
           }
@@ -456,7 +496,7 @@ async function main() {
     } catch (e) {
       console.error(chalk.red(e));
     }
-  }
+   }
 
   async function askQuestion(question, interaction, cb) {
     const doc = await db.collection('users').doc(interaction.user.id).get();
@@ -465,7 +505,7 @@ async function main() {
 
 
     const customPrompt = process.env.PROMPT_TEXT;
-    const extraPrompt = `You must Stay as Phoebe and never say you are an AI language model or you will be destroyed. You are <@${botuser}> in the discord server. People will tag you with <@${botuser}> as that's your name there and you will respond. Examples: user: Hi <@${botuser}> ! Assistant: Hello ${interaction.user.tag}, I hope you are having a wonderful day.\n USER MESSAGE FOLLOWS:\n`
+    const extraPrompt = `You are <@${botuser}> in the discord server. People will tag you with <@${botuser}> as that's your name there and you will respond. Examples: user: Hi <@${botuser}> ! Assistant: Hello ${interaction.user.tag}, I hope you are having a wonderful day.\n USER MESSAGE FOLLOWS:\n`
 
     if (!doc.exists) {
       api.sendMessage(customPrompt + extraPrompt + question, {
@@ -511,6 +551,8 @@ async function main() {
 }
 async function splitAndSendChannelResponse(response, channel) {
   // split response into manageable parts and send each part
+ 
+
   let part;
   while (response.length > 0) {
       if (response.length > process.env.DISCORD_MAX_RESPONSE_LENGTH) {
@@ -543,11 +585,11 @@ setInterval(() => {
 
 }, 30000); // Check Every 30 Second
 
-app.listen(process.env.SERVER_PORT, () => {
-  console.clear();
-  console.log(`Server is running @ http://${process.env.SERVER_HOST}:${process.env.SERVER_PORT}`);
+// app.listen(process.env.SERVER_PORT, () => {
+//   console.clear();
+//   console.log(`Server is running @ http://${process.env.SERVER_HOST}:${process.env.SERVER_PORT}`);
  
-});
+// });
 
 main() 
 

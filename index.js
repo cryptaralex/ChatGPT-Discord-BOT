@@ -6,7 +6,7 @@ import chalk from 'chalk';
 import figlet from 'figlet';
 import gradient from 'gradient-string';
 import admin from 'firebase-admin';
-import VoiceTranscriptor from "./handlers/VoiceTranscriptor.js";
+//import VoiceTranscriptor from "./handlers/VoiceTranscriptor.js";
 import Keyv from 'keyv';
 import KeyvFirestore from 'keyv-firestore';
 import express from 'express';

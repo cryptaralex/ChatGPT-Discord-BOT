@@ -715,7 +715,7 @@ async function main() {
       resp = resp.slice(end, resp.length)
     }
   }
-}
+
 async function splitAndSendChannelResponse(response, channel) {
   // split response into manageable parts and send each part
  

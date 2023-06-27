@@ -40,7 +40,7 @@ import {
 const firebaseServiceAccount = JSON.parse(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, 'base64').toString());
 
 import { channel } from 'diagnostics_channel';
-import { TNL } from 'tnl-midjourney-api';
+//import { TNL } from 'tnl-midjourney-api';
 
 
 // Defines

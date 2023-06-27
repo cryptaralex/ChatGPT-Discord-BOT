@@ -10,8 +10,8 @@ import admin from 'firebase-admin';
 import Keyv from 'keyv';
 import KeyvFirestore from 'keyv-firestore';
 import express from 'express';
-// import { joinVoiceChannel } from '@discordjs/voice';
-// import EventEmitter from "events";
+//import { joinVoiceChannel } from '@discordjs/voice';
+//import EventEmitter from "events";
 
 
 //const EventManager = new EventEmitter();
@@ -441,20 +441,20 @@ async function main() {
     client.user.setActivity(activity);
   }
 
-// async function voice_Interaction_Handeler(interaction) {
+async function voice_Interaction_Handeler(interaction) {
 
 
-//   const voiceChannel = interaction.member.voice.channel;
-//   if (!voiceChannel)
-//       return msg.reply({ content: "Please join a voice channel first." });
-//       const connection = fixConnectionIssue(
-//        joinVoiceChannel({
-//           channelId: voiceChannel.id,
-//           guildId: voiceChannel.guild.id,
-//          adapterCreator: voiceChannel.guild.voiceAdapterCreator,
-//          selfDeaf: false,
-//      })
-//   );
+  const voiceChannel = interaction.member.voice.channel;
+  if (!voiceChannel)
+      return msg.reply({ content: "Please join a voice channel first." });
+      const connection = fixConnectionIssue(
+       joinVoiceChannel({
+          channelId: voiceChannel.id,
+          guildId: voiceChannel.guild.id,
+         adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+         selfDeaf: false,
+     })
+  );
 
   // await new VoiceTranscriptor(EventManager).startListening(
   //    interaction,
@@ -464,23 +464,23 @@ async function main() {
 }
 
 
-// const fixConnectionIssue = (connection) => {
-//   connection.on("stateChange", (oldState, newState) => {
-//       const oldNetworking = Reflect.get(oldState, "networking");
-//       const newNetworking = Reflect.get(newState, "networking");
+const fixConnectionIssue = (connection) => {
+  connection.on("stateChange", (oldState, newState) => {
+      const oldNetworking = Reflect.get(oldState, "networking");
+      const newNetworking = Reflect.get(newState, "networking");
 
-//       const networkStateChangeHandler = (
-//           oldNetworkState,
-//           newNetworkState
-//       ) => {
-//           const newUdp = Reflect.get(newNetworkState, "udp");
-//           clearInterval(newUdp?.keepAliveInterval);
-//       };
-//       oldNetworking?.off("stateChange", networkStateChangeHandler);
-//       newNetworking?.on("stateChange", networkStateChangeHandler);
-//   });
-//   return connection;
-// };
+      const networkStateChangeHandler = (
+          oldNetworkState,
+          newNetworkState
+      ) => {
+          const newUdp = Reflect.get(newNetworkState, "udp");
+          clearInterval(newUdp?.keepAliveInterval);
+      };
+      oldNetworking?.off("stateChange", networkStateChangeHandler);
+      newNetworking?.on("stateChange", networkStateChangeHandler);
+  });
+  return connection;
+};
 
 
 
@@ -594,58 +594,58 @@ async function main() {
   //   interaction.editReply({ embeds: [errEmbed] });
   //   } catch (error){console.log("An Error occured during handling an error");}
   //   }
-  //}
+  // }
 
-   async function ask_Interaction_Handler(interaction) {
-    const question = interaction.options.getString("question");
+  //  async function ask_Interaction_Handler(interaction) {
+  //   const question = interaction.options.getString("question");
 
-    console.log("----------Channel Message--------");
-   console.log("Date & Time : " + new Date());
-    console.log("UserId      : " + interaction.user.id);
-   console.log("User        : " + interaction.user.tag);
-    console.log("Question    : " + question);
+  //   console.log("----------Channel Message--------");
+  //  console.log("Date & Time : " + new Date());
+  //   console.log("UserId      : " + interaction.user.id);
+  //  console.log("User        : " + interaction.user.tag);
+  //   console.log("Question    : " + question);
 
-    try {
-      await interaction.reply({ content: `I'm thinking 🤔` });
-      askQuestion(question, interaction, async (content) => {
-        if (!content.text) {
-           if (content.length >= process.env.DISCORD_MAX_RESPONSE_LENGTH) {
-           await interaction.editReply(`**${interaction.user.tag}:** ${question}\n**${client.user.username}:** API Error ❌\nCheck DM For Error Log ❗\n`);
-           splitAndSendResponse(content, interaction.user);
-          } else {
-            await interaction.editReply(`**${interaction.user.tag}:** ${question}\n**${client.user.username}:** API Error ❌\n\`\`\`\n${content}\n\`\`\`\n`);
-          }
-          client.user.setActivity(activity);
-          return;
-        }
+  //   try {
+  //     await interaction.reply({ content: `I'm thinking 🤔` });
+  //     askQuestion(question, interaction, async (content) => {
+  //       if (!content.text) {
+  //          if (content.length >= process.env.DISCORD_MAX_RESPONSE_LENGTH) {
+  //          await interaction.editReply(`**${interaction.user.tag}:** ${question}\n**${client.user.username}:** API Error ❌\nCheck DM For Error Log ❗\n`);
+  //          splitAndSendResponse(content, interaction.user);
+  //         } else {
+  //           await interaction.editReply(`**${interaction.user.tag}:** ${question}\n**${client.user.username}:** API Error ❌\n\`\`\`\n${content}\n\`\`\`\n`);
+  //         }
+  //         client.user.setActivity(activity);
+  //         return;
+  //       }
 
-        console.log("Response    : " + content.text);
-        console.log("---------------End---------------");
+  //       console.log("Response    : " + content.text);
+  //       console.log("---------------End---------------");
 
-        if (content.text.length >= process.env.DISCORD_MAX_RESPONSE_LENGTH) {
-          await interaction.editReply({ content: "The Answer Is Too Powerful 🤯,\nCheck Your DM 😅" });
-          splitAndSendResponse(content.text, interaction.user);
-        } else {
-          await interaction.editReply(`**${interaction.user.tag}:** ${question}\n**${client.user.username}:** ${content.text}\n`);
-        }
-        client.user.setActivity(activity);
-        const timeStamp = new Date();
-        const date = timeStamp.getUTCDate().toString() + '.' + timeStamp.getUTCMonth().toString() + '.' + timeStamp.getUTCFullYear().toString();
-        const time = timeStamp.getUTCHours().toString() + ':' + timeStamp.getUTCMinutes().toString() + ':' + timeStamp.getUTCSeconds().toString();
-        await db.collection('chat-history').doc(interaction.user.id)
-          .collection(date).doc(time).set({
-            timeStamp: new Date(),
-            userID: interaction.user.id,
-            user: interaction.user.tag,
-            question: question,
-            answer: content.text,
-            parentMessageId: content.id
-          });
-      })
-    } catch (e) {
-      console.error(chalk.red(e));
-    }
-   }
+  //       if (content.text.length >= process.env.DISCORD_MAX_RESPONSE_LENGTH) {
+  //         await interaction.editReply({ content: "The Answer Is Too Powerful 🤯,\nCheck Your DM 😅" });
+  //         splitAndSendResponse(content.text, interaction.user);
+  //       } else {
+  //         await interaction.editReply(`**${interaction.user.tag}:** ${question}\n**${client.user.username}:** ${content.text}\n`);
+  //       }
+  //       client.user.setActivity(activity);
+  //       const timeStamp = new Date();
+  //       const date = timeStamp.getUTCDate().toString() + '.' + timeStamp.getUTCMonth().toString() + '.' + timeStamp.getUTCFullYear().toString();
+  //       const time = timeStamp.getUTCHours().toString() + ':' + timeStamp.getUTCMinutes().toString() + ':' + timeStamp.getUTCSeconds().toString();
+  //       await db.collection('chat-history').doc(interaction.user.id)
+  //         .collection(date).doc(time).set({
+  //           timeStamp: new Date(),
+  //           userID: interaction.user.id,
+  //           user: interaction.user.tag,
+  //           question: question,
+  //           answer: content.text,
+  //           parentMessageId: content.id
+  //         });
+  //     })
+  //   } catch (e) {
+  //     console.error(chalk.red(e));
+  //   }
+  //  }
 
   async function askQuestion(question, interaction, cb) {
     const doc = await db.collection('users').doc(interaction.user.id).get();
@@ -715,7 +715,7 @@ async function main() {
       resp = resp.slice(end, resp.length)
     }
   }
-
+}
 async function splitAndSendChannelResponse(response, channel) {
   // split response into manageable parts and send each part
  

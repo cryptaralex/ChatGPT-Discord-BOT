@@ -10,11 +10,11 @@ import VoiceTranscriptor from "./handlers/VoiceTranscriptor.js";
 import Keyv from 'keyv';
 import KeyvFirestore from 'keyv-firestore';
 import express from 'express';
-import { joinVoiceChannel } from '@discordjs/voice';
-import EventEmitter from "events";
+// import { joinVoiceChannel } from '@discordjs/voice';
+// import EventEmitter from "events";
 
 
-const EventManager = new EventEmitter();
+//const EventManager = new EventEmitter();
 // import {
 //   joinVoiceChannel,
 //   createAudioPlayer,
@@ -441,20 +441,20 @@ async function main() {
     client.user.setActivity(activity);
   }
 
-async function voice_Interaction_Handeler(interaction) {
+// async function voice_Interaction_Handeler(interaction) {
 
 
-  const voiceChannel = interaction.member.voice.channel;
-  if (!voiceChannel)
-      return msg.reply({ content: "Please join a voice channel first." });
-      const connection = fixConnectionIssue(
-       joinVoiceChannel({
-          channelId: voiceChannel.id,
-          guildId: voiceChannel.guild.id,
-         adapterCreator: voiceChannel.guild.voiceAdapterCreator,
-         selfDeaf: false,
-     })
-  );
+//   const voiceChannel = interaction.member.voice.channel;
+//   if (!voiceChannel)
+//       return msg.reply({ content: "Please join a voice channel first." });
+//       const connection = fixConnectionIssue(
+//        joinVoiceChannel({
+//           channelId: voiceChannel.id,
+//           guildId: voiceChannel.guild.id,
+//          adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+//          selfDeaf: false,
+//      })
+//   );
 
   // await new VoiceTranscriptor(EventManager).startListening(
   //    interaction,
@@ -464,23 +464,23 @@ async function voice_Interaction_Handeler(interaction) {
 }
 
 
-const fixConnectionIssue = (connection) => {
-  connection.on("stateChange", (oldState, newState) => {
-      const oldNetworking = Reflect.get(oldState, "networking");
-      const newNetworking = Reflect.get(newState, "networking");
+// const fixConnectionIssue = (connection) => {
+//   connection.on("stateChange", (oldState, newState) => {
+//       const oldNetworking = Reflect.get(oldState, "networking");
+//       const newNetworking = Reflect.get(newState, "networking");
 
-      const networkStateChangeHandler = (
-          oldNetworkState,
-          newNetworkState
-      ) => {
-          const newUdp = Reflect.get(newNetworkState, "udp");
-          clearInterval(newUdp?.keepAliveInterval);
-      };
-      oldNetworking?.off("stateChange", networkStateChangeHandler);
-      newNetworking?.on("stateChange", networkStateChangeHandler);
-  });
-  return connection;
-};
+//       const networkStateChangeHandler = (
+//           oldNetworkState,
+//           newNetworkState
+//       ) => {
+//           const newUdp = Reflect.get(newNetworkState, "udp");
+//           clearInterval(newUdp?.keepAliveInterval);
+//       };
+//       oldNetworking?.off("stateChange", networkStateChangeHandler);
+//       newNetworking?.on("stateChange", networkStateChangeHandler);
+//   });
+//   return connection;
+// };
 
 
 

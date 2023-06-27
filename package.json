@@ -14,19 +14,23 @@
     "prod": "npm i pm2 -g && pm2 start index.js -n chatgpt-bot"
   },
   "dependencies": {
+    "@discordjs/opus": "^0.9.0",
+    "@discordjs/voice": "^0.16.0",
     "@types/node": "^18.16.3",
     "axios": "^1.4.0",
     "chalk": "^5.2.0",
     "chatgpt": "^5.2.4",
-    "discord.js": "^14.10.2",
+    "discord.js": "^14.11.0",
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
+    "ffmpeg": "^0.0.4",
     "figlet": "^1.6.0",
     "firebase-admin": "^11.7.0",
     "gradient-string": "^2.0.2",
     "keyv": "^4.5.2",
     "keyv-firestore": "^1.1.1",
     "node-fetch": "^3.3.1",
-    "replicate": "^0.12.3"
+    "replicate": "^0.12.3",
+    "tnl-midjourney-api": "^1.0.3"
   }
 }

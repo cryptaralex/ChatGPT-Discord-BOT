@@ -6,9 +6,20 @@ import chalk from 'chalk';
 import figlet from 'figlet';
 import gradient from 'gradient-string';
 import admin from 'firebase-admin';
+import VoiceTranscriptor from "./handlers/VoiceTranscriptor.js";
 import Keyv from 'keyv';
 import KeyvFirestore from 'keyv-firestore';
 import express from 'express';
+import { joinVoiceChannel } from '@discordjs/voice';
+import EventEmitter from "events";
+
+
+const EventManager = new EventEmitter();
+// import {
+//   joinVoiceChannel,
+//   createAudioPlayer,
+//   NoSubscriberBehavior,
+// } from "discord.js/voice";
 
 const app = express();
 
@@ -29,6 +40,7 @@ import {
 const firebaseServiceAccount = JSON.parse(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, 'base64').toString());
 
 import { channel } from 'diagnostics_channel';
+import { TNL } from 'tnl-midjourney-api';
 
 
 // Defines
@@ -49,25 +61,42 @@ const commands = [
       }
     ]
   },
-  {
-    name: 'imagine',
-    description: 'Generate an image using a prompt.',
-    options: [
-      {
-        name: 'prompt',
-        description: 'Enter your prompt',
-        type: ApplicationCommandOptionType.String,
-        required: true,
-      },
-      {
-        name: 'model',
-        description: 'The image model',
-        type: ApplicationCommandOptionType.String,
-        choices: models,
-        required: false,
-      },
-    ],
-  },
+  // {
+  //   name: 'mjimagine',
+  //   description: 'Midjourney!!!!',
+  //   dm_permission: false,
+  //   options: [
+  //     {
+  //       name: "prompt",
+  //       description: "Enter tyour prompt",
+  //       type: ApplicationCommandOptionType.String,
+  //       required: true
+  //     }
+  //   ]
+  // },
+  // {
+  //   name: 'imagine',
+  //   description: 'Generate an image using a prompt.',
+  //   options: [
+  //     {
+  //       name: 'prompt',
+  //       description: 'Enter your prompt',
+  //       type: ApplicationCommandOptionType.String,
+  //       required: true,
+  //     },
+  //     {
+  //       name: 'model',
+  //       description: 'The image model',
+  //       type: ApplicationCommandOptionType.String,
+  //       choices: models,
+  //       required: false,
+  //     },
+  //   ],
+  // },
+  // {
+  //   name: 'voice',
+  //   description: 'Connect to voice chat'
+  // },
   {
     name: 'ping',
     description: 'Check Websocket Heartbeat && Roundtrip Latency'
@@ -200,9 +229,15 @@ async function main() {
     //  case "ask":
     //    ask_Interaction_Handler(interaction);
     //    break;
-      case "imagine":
-        imagine_Interaction_Handler(interaction);
-        break;
+    //  case "voice":
+    //     voice_Interaction_Handeler(interaction);
+    //     break; 
+    //  case "imagine":
+    //     mjimage_Interaction_Handler(interaction);
+    //     break;
+    //  case "mjimagine":
+    //     mjimage_Interaction_Handler(interaction);
+    //     break;
       case "ping":
         ping_Interaction_Handler(interaction);
         break;
@@ -265,9 +300,15 @@ async function main() {
   
       askQuestion(message.content, interaction, async (response) => {
         if (!response.text) {
-          if (response.length >= process.env.DISCORD_MAX_RESPONSE_LENGTH) {
+          if (response.length >= process.env.DISCORD_MAX_RESPONSE_LENGTH && dmcheck) {
             splitAndSendChannelResponse(response, message.channel)
-          } else {
+          }  else if (response.length >= process.env.DISCORD_MAX_RESPONSE_LENGTH && !dmcheck) {
+            await message.channel.send("The Answer Is Too Powerful 🤯,\nCheck Your DM 😅");
+                    splitAndSendResponse(response, message.author.tag);
+             // splitAndSendChannelResponse(response, message.channel)
+          } 
+          
+          else {
             if (dmCheck) {
               await sentMessage.edit(`API Error ❌\n\`\`\`\n${response}\n\`\`\`\n`)
             } else {
@@ -276,10 +317,16 @@ async function main() {
           }
           return;
         }
+        
       
         if (response.text.length >= process.env.DISCORD_MAX_RESPONSE_LENGTH) {
-          splitAndSendChannelResponse(response.text, message.channel)
-        } else {
+          splitAndSendChannelResponse(response.text, message.channel);
+        }  else if (response.length >= process.env.DISCORD_MAX_RESPONSE_LENGTH && !dmcheck) {
+          await message.channel.send("The Answer Is Too Powerful 🤯,\nCheck Your DM 😅");
+                  splitAndSendResponse(response, message.author.tag);
+           // splitAndSendChannelResponse(response, message.channel)
+        } 
+        else {
           if (dmCheck) {
             await sentMessage.edit(response.text)
           } else {
@@ -291,8 +338,11 @@ async function main() {
           
         
           try {
-            const regex = /!\[Image\]\[(.*?(?=\]|\)))/;
-            const prompt = 'midjrny-v4 style,' + response.text.match(regex)[1];
+            //const regex = /!\[Image\]\[(.*?(?=\]|\)))/;
+            const regex = /!\[Image\]\[(.*?(?=\]|\>>|\)))/;
+            
+
+            const prompt = 'midjrny-v4 style, photo,' + response.text.match(regex)[1];
           
             console.log(prompt);
       
@@ -355,7 +405,7 @@ async function main() {
   }
 
   async function help_Interaction_Handler(interaction) {
-    await interaction.reply("**Singularity AI**\nA Discord AI Bot Powered by Bitcoin Ordinals!\n\n**Usage:**\nDM - Ask Anything\n`/ask` - Ask Anything\n`/reset-chat` - Start A Fresh Chat Session\n`/ping` - Check Websocket Heartbeat && Roundtrip Latency\n\nSupport Server: https://discord.gg/btcai");
+    await interaction.reply("**Singularity AI**\nA Discord AI Bot Powered by Bitcoin Ordinals!\n\n**Usage:**\nDM - Tag or metion\n`/reset-chat` - Start A Fresh Chat Session\n`/ping` - Check Websocket Heartbeat && Roundtrip Latency\n\nSupport Server: https://discord.gg/btcai");
     client.user.setActivity(activity);
   }
 
@@ -367,7 +417,7 @@ async function main() {
     const doc = await db.collection('users').doc(interaction.user.id).get();
     if (!doc.exists) {
       console.log('Failed: No Conversation Found ❌');
-      await interaction.editReply('No Conversation Found ❌\nUse `/ask` To Start One\n');
+      await interaction.editReply('No Conversation Found ❌\nTag The Bot To Start One\n');
       await db.collection('reset-chat-log').doc(interaction.user.id)
         .collection(date).doc(time).set({
           timeStamp: new Date(),
@@ -391,6 +441,50 @@ async function main() {
     client.user.setActivity(activity);
   }
 
+async function voice_Interaction_Handeler(interaction) {
+
+
+  const voiceChannel = interaction.member.voice.channel;
+  if (!voiceChannel)
+      return msg.reply({ content: "Please join a voice channel first." });
+      const connection = fixConnectionIssue(
+       joinVoiceChannel({
+          channelId: voiceChannel.id,
+          guildId: voiceChannel.guild.id,
+         adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+         selfDeaf: false,
+     })
+  );
+
+  // await new VoiceTranscriptor(EventManager).startListening(
+  //    interaction,
+  //      client,
+  //     connection
+  //  );
+}
+
+
+const fixConnectionIssue = (connection) => {
+  connection.on("stateChange", (oldState, newState) => {
+      const oldNetworking = Reflect.get(oldState, "networking");
+      const newNetworking = Reflect.get(newState, "networking");
+
+      const networkStateChangeHandler = (
+          oldNetworkState,
+          newNetworkState
+      ) => {
+          const newUdp = Reflect.get(newNetworkState, "udp");
+          clearInterval(newUdp?.keepAliveInterval);
+      };
+      oldNetworking?.off("stateChange", networkStateChangeHandler);
+      newNetworking?.on("stateChange", networkStateChangeHandler);
+  });
+  return connection;
+};
+
+
+
+
   async function imagine_Interaction_Handler(interaction) {
     try {
       await interaction.deferReply();
@@ -407,7 +501,7 @@ async function main() {
       const timeout = new Promise((_, reject) => {
         setTimeout(() => {
           reject(new Error('Replication deadline exceeded.'));
-        }, 90000); // Adjust the timeout duration as needed
+        }, 180000); // Adjust the timeout duration as needed
       });
       const output = await Promise.race([replicate.run(model, { input: { prompt } }), timeout]);
 
@@ -447,64 +541,137 @@ async function main() {
 
   
 
-   async function ask_Interaction_Handler(interaction) {
-    const question = interaction.options.getString("question");
 
-    console.log("----------Channel Message--------");
-   console.log("Date & Time : " + new Date());
-    console.log("UserId      : " + interaction.user.id);
-   console.log("User        : " + interaction.user.tag);
-    console.log("Question    : " + question);
+  // async function mjimage_Interaction_Handler(interaction) {
+  //   try {
+  //     await interaction.deferReply();
 
-    try {
-      await interaction.reply({ content: `I'm thinking 🤔` });
-      askQuestion(question, interaction, async (content) => {
-        if (!content.text) {
-           if (content.length >= process.env.DISCORD_MAX_RESPONSE_LENGTH) {
-           await interaction.editReply(`**${interaction.user.tag}:** ${question}\n**${client.user.username}:** API Error ❌\nCheck DM For Error Log ❗\n`);
-           splitAndSendResponse(content, interaction.user);
-          } else {
-            await interaction.editReply(`**${interaction.user.tag}:** ${question}\n**${client.user.username}:** API Error ❌\n\`\`\`\n${content}\n\`\`\`\n`);
-          }
-          client.user.setActivity(activity);
-          return;
-        }
+  //    // const { default: Replicate } = await import('replicate');
 
-        console.log("Response    : " + content.text);
-        console.log("---------------End---------------");
+  //     const tnl = new TNL(process.env.TNL_API_KEY);
 
-        if (content.text.length >= process.env.DISCORD_MAX_RESPONSE_LENGTH) {
-          await interaction.editReply({ content: "The Answer Is Too Powerful 🤯,\nCheck Your DM 😅" });
-          splitAndSendResponse(content.text, interaction.user);
-        } else {
-          await interaction.editReply(`**${interaction.user.tag}:** ${question}\n**${client.user.username}:** ${content.text}\n`);
-        }
-        client.user.setActivity(activity);
-        const timeStamp = new Date();
-        const date = timeStamp.getUTCDate().toString() + '.' + timeStamp.getUTCMonth().toString() + '.' + timeStamp.getUTCFullYear().toString();
-        const time = timeStamp.getUTCHours().toString() + ':' + timeStamp.getUTCMinutes().toString() + ':' + timeStamp.getUTCSeconds().toString();
-        await db.collection('chat-history').doc(interaction.user.id)
-          .collection(date).doc(time).set({
-            timeStamp: new Date(),
-            userID: interaction.user.id,
-            user: interaction.user.tag,
-            question: question,
-            answer: content.text,
-            parentMessageId: content.id
-          });
-      })
-    } catch (e) {
-      console.error(chalk.red(e));
-    }
-   }
+  //     const prompt = interaction.options.getString('prompt');
+  //     //const model = interaction.options.getString('model') || models[0].value;
+
+  //     const timeout = new Promise((_, reject) => {
+  //       setTimeout(() => {
+  //         reject(new Error('Replication deadline exceeded.'));
+  //       }, 180000); // Adjust the timeout duration as needed
+  //     });
+  //     console.log("yo I here");
+  //     const output = await tnl.imagine(prompt);
+  //     console.log(output);
+
+  //     const row = new ActionRowBuilder().addComponents(
+  //       new ButtonBuilder()
+  //         .setLabel(`Download`)
+  //         .setStyle(ButtonStyle.Link)
+  //         .setURL(`${output[0]}`)
+  //         .setEmoji('1101133529607327764')
+  //     );
+
+  //     const resultEmbed = new EmbedBuilder()
+  //       .setTitle('Image Generated')
+  //       .addFields({ name: 'Prompt', value: prompt })
+  //       .setImage(output[0])
+  //       .setColor('#44a3e3')
+  //       .setFooter({
+  //         text: `Requested by ${interaction.user.username}`,
+  //         iconURL: interaction.user.displayAvatarURL({ dynamic: true }),
+  //       });
+
+  //     await interaction.editReply({
+  //       embeds: [resultEmbed],
+  //       components: [row],
+  //     });
+  //   } catch (error) {
+  //     const errEmbed = new EmbedBuilder()
+  //       .setTitle('An error occurred')
+  //       .setDescription('```' + error + '```')
+  //       .setColor(0xe32424);
+
+  //   try {     
+  //   interaction.editReply({ embeds: [errEmbed] });
+  //   } catch (error){console.log("An Error occured during handling an error");}
+  //   }
+  // }
+
+  //  async function ask_Interaction_Handler(interaction) {
+  //   const question = interaction.options.getString("question");
+
+  //   console.log("----------Channel Message--------");
+  //  console.log("Date & Time : " + new Date());
+  //   console.log("UserId      : " + interaction.user.id);
+  //  console.log("User        : " + interaction.user.tag);
+  //   console.log("Question    : " + question);
+
+  //   try {
+  //     await interaction.reply({ content: `I'm thinking 🤔` });
+  //     askQuestion(question, interaction, async (content) => {
+  //       if (!content.text) {
+  //          if (content.length >= process.env.DISCORD_MAX_RESPONSE_LENGTH) {
+  //          await interaction.editReply(`**${interaction.user.tag}:** ${question}\n**${client.user.username}:** API Error ❌\nCheck DM For Error Log ❗\n`);
+  //          splitAndSendResponse(content, interaction.user);
+  //         } else {
+  //           await interaction.editReply(`**${interaction.user.tag}:** ${question}\n**${client.user.username}:** API Error ❌\n\`\`\`\n${content}\n\`\`\`\n`);
+  //         }
+  //         client.user.setActivity(activity);
+  //         return;
+  //       }
+
+  //       console.log("Response    : " + content.text);
+  //       console.log("---------------End---------------");
+
+  //       if (content.text.length >= process.env.DISCORD_MAX_RESPONSE_LENGTH) {
+  //         await interaction.editReply({ content: "The Answer Is Too Powerful 🤯,\nCheck Your DM 😅" });
+  //         splitAndSendResponse(content.text, interaction.user);
+  //       } else {
+  //         await interaction.editReply(`**${interaction.user.tag}:** ${question}\n**${client.user.username}:** ${content.text}\n`);
+  //       }
+  //       client.user.setActivity(activity);
+  //       const timeStamp = new Date();
+  //       const date = timeStamp.getUTCDate().toString() + '.' + timeStamp.getUTCMonth().toString() + '.' + timeStamp.getUTCFullYear().toString();
+  //       const time = timeStamp.getUTCHours().toString() + ':' + timeStamp.getUTCMinutes().toString() + ':' + timeStamp.getUTCSeconds().toString();
+  //       await db.collection('chat-history').doc(interaction.user.id)
+  //         .collection(date).doc(time).set({
+  //           timeStamp: new Date(),
+  //           userID: interaction.user.id,
+  //           user: interaction.user.tag,
+  //           question: question,
+  //           answer: content.text,
+  //           parentMessageId: content.id
+  //         });
+  //     })
+  //   } catch (e) {
+  //     console.error(chalk.red(e));
+  //   }
+  //  }
 
   async function askQuestion(question, interaction, cb) {
     const doc = await db.collection('users').doc(interaction.user.id).get();
     const currentDate = new Date().toISOString();
-    const finalSystemMessage = process.env.SYSTEM_MESSAGE;
+    const systemMessage = process.env.SYSTEM_MESSAGE;
+   
+    const botName = process.env.BOT_NAME;
+    const botFood = process.env.BOT_FOOD;
+    const botBriggs = process.env.BOT_PERSONALITY;
+
+    console.log(botBriggs);
+    
+    const neralyfinalSystemMessage = systemMessage
+      .replace(/\[NAME\]/g, botName)
+      .replace(/\[FOOD\]/g, botFood);
+
+    const systemStart = `You are ${botName} using the tag <@${botuser}> in the discord server. ${botName} is a vibrant human with the ${botBriggs}.`;
+    const finalSystemMessage = systemStart + neralyfinalSystemMessage;
 
 
-    const customPrompt = process.env.PROMPT_TEXT;
+    const systemPrompt = process.env.PROMPT_TEXT;
+    const customPrompt = systemPrompt
+      .replace(/\[NAME\]/g, botName)
+      .replace(/\[FOOD\]/g, botFood);
+
+
     const extraPrompt = `You are <@${botuser}> in the discord server. People will tag you with <@${botuser}> as that's your name there and you will respond. Examples: user: Hi <@${botuser}> ! Assistant: Hello ${interaction.user.tag}, I hope you are having a wonderful day.\n USER MESSAGE FOLLOWS:\n`
 
     if (!doc.exists) {

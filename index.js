@@ -22,7 +22,7 @@ import express from 'express';
 // } from "discord.js/voice";
 
 const app = express();
-
+//import execute from './imagineButton.js';
 import models from './models.js';
 import {
   Client, REST, Partials,
@@ -40,12 +40,15 @@ import {
 const firebaseServiceAccount = JSON.parse(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, 'base64').toString());
 
 import { channel } from 'diagnostics_channel';
-//import { TNL } from 'tnl-midjourney-api';
 
+const sleep = async (ms) => {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+};
 
 // Defines
-const activity = '/ask && /imagine && /help'
-let botuser;
+const activity = '/ask && /replicate && /help'
+let botuser; // global so everyone we can see the user deeply in function calls
+
 // Discord Slash Commands Defines
 const commands = [
   {
@@ -61,38 +64,26 @@ const commands = [
       }
     ]
   },
-  // {
-  //   name: 'mjimagine',
-  //   description: 'Midjourney!!!!',
-  //   dm_permission: false,
-  //   options: [
-  //     {
-  //       name: "prompt",
-  //       description: "Enter tyour prompt",
-  //       type: ApplicationCommandOptionType.String,
-  //       required: true
-  //     }
-  //   ]
-  // },
-  // {
-  //   name: 'imagine',
-  //   description: 'Generate an image using a prompt.',
-  //   options: [
-  //     {
-  //       name: 'prompt',
-  //       description: 'Enter your prompt',
-  //       type: ApplicationCommandOptionType.String,
-  //       required: true,
-  //     },
-  //     {
-  //       name: 'model',
-  //       description: 'The image model',
-  //       type: ApplicationCommandOptionType.String,
-  //       choices: models,
-  //       required: false,
-  //     },
-  //   ],
-  // },
+
+   {
+     name: 'replicate',
+     description: 'Generate an image using a prompt.',
+     options: [
+      {
+        name: 'prompt',
+        description: 'Enter your prompt',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+      {
+        name: 'model',
+        description: 'The image model',
+        type: ApplicationCommandOptionType.String,
+        choices: models,
+        required: false,
+      },
+    ],
+  },
   // {
   //   name: 'voice',
   //   description: 'Connect to voice chat'
@@ -171,6 +162,9 @@ async function initKeyvFirestore() {
   return messageStore;
 }
 
+
+
+
 // Main Function (Execution Starts From Here)
 async function main() {
   if (process.env.UWU === 'true') {
@@ -221,6 +215,9 @@ async function main() {
 
   // Channel Message Handler
   client.on("interactionCreate", async interaction => {
+  //handle image button here I think
+
+  
     if (!interaction.isChatInputCommand()) return;
 
     client.user.setActivity(interaction.user.tag, { type: ActivityType.Watching });
@@ -232,12 +229,9 @@ async function main() {
     //  case "voice":
     //     voice_Interaction_Handeler(interaction);
     //     break; 
-    //  case "imagine":
-    //     mjimage_Interaction_Handler(interaction);
-    //     break;
-    //  case "mjimagine":
-    //     mjimage_Interaction_Handler(interaction);
-    //     break;
+      case "replicate":
+        replicate_Interaction_handler(interaction);
+        break;
       case "ping":
         ping_Interaction_Handler(interaction);
         break;
@@ -342,7 +336,7 @@ async function main() {
             const regex = /!\[Image\]\[(.*?(?=\]|\>>|\)))/;
             
 
-            const prompt = 'midjrny-v4 style, photo,' + response.text.match(regex)[1];
+            const prompt = 'mdjrny-v4 style, photo,' + response.text.match(regex)[1];
           
             console.log(prompt);
       
@@ -485,7 +479,7 @@ const fixConnectionIssue = (connection) => {
 
 
 
-  async function imagine_Interaction_Handler(interaction) {
+  async function replicate_Interaction_handler(interaction) {
     try {
       await interaction.deferReply();
 
@@ -540,112 +534,6 @@ const fixConnectionIssue = (connection) => {
   }
 
   
-
-
-  // async function mjimage_Interaction_Handler(interaction) {
-  //   try {
-  //     await interaction.deferReply();
-
-  //    // const { default: Replicate } = await import('replicate');
-
-  //     const tnl = new TNL(process.env.TNL_API_KEY);
-
-  //     const prompt = interaction.options.getString('prompt');
-  //     //const model = interaction.options.getString('model') || models[0].value;
-
-  //     const timeout = new Promise((_, reject) => {
-  //       setTimeout(() => {
-  //         reject(new Error('Replication deadline exceeded.'));
-  //       }, 180000); // Adjust the timeout duration as needed
-  //     });
-  //     console.log("yo I here");
-  //     const output = await tnl.imagine(prompt);
-  //     console.log(output);
-
-  //     const row = new ActionRowBuilder().addComponents(
-  //       new ButtonBuilder()
-  //         .setLabel(`Download`)
-  //         .setStyle(ButtonStyle.Link)
-  //         .setURL(`${output[0]}`)
-  //         .setEmoji('1101133529607327764')
-  //     );
-
-  //     const resultEmbed = new EmbedBuilder()
-  //       .setTitle('Image Generated')
-  //       .addFields({ name: 'Prompt', value: prompt })
-  //       .setImage(output[0])
-  //       .setColor('#44a3e3')
-  //       .setFooter({
-  //         text: `Requested by ${interaction.user.username}`,
-  //         iconURL: interaction.user.displayAvatarURL({ dynamic: true }),
-  //       });
-
-  //     await interaction.editReply({
-  //       embeds: [resultEmbed],
-  //       components: [row],
-  //     });
-  //   } catch (error) {
-  //     const errEmbed = new EmbedBuilder()
-  //       .setTitle('An error occurred')
-  //       .setDescription('```' + error + '```')
-  //       .setColor(0xe32424);
-
-  //   try {     
-  //   interaction.editReply({ embeds: [errEmbed] });
-  //   } catch (error){console.log("An Error occured during handling an error");}
-  //   }
-  // }
-
-  //  async function ask_Interaction_Handler(interaction) {
-  //   const question = interaction.options.getString("question");
-
-  //   console.log("----------Channel Message--------");
-  //  console.log("Date & Time : " + new Date());
-  //   console.log("UserId      : " + interaction.user.id);
-  //  console.log("User        : " + interaction.user.tag);
-  //   console.log("Question    : " + question);
-
-  //   try {
-  //     await interaction.reply({ content: `I'm thinking 🤔` });
-  //     askQuestion(question, interaction, async (content) => {
-  //       if (!content.text) {
-  //          if (content.length >= process.env.DISCORD_MAX_RESPONSE_LENGTH) {
-  //          await interaction.editReply(`**${interaction.user.tag}:** ${question}\n**${client.user.username}:** API Error ❌\nCheck DM For Error Log ❗\n`);
-  //          splitAndSendResponse(content, interaction.user);
-  //         } else {
-  //           await interaction.editReply(`**${interaction.user.tag}:** ${question}\n**${client.user.username}:** API Error ❌\n\`\`\`\n${content}\n\`\`\`\n`);
-  //         }
-  //         client.user.setActivity(activity);
-  //         return;
-  //       }
-
-  //       console.log("Response    : " + content.text);
-  //       console.log("---------------End---------------");
-
-  //       if (content.text.length >= process.env.DISCORD_MAX_RESPONSE_LENGTH) {
-  //         await interaction.editReply({ content: "The Answer Is Too Powerful 🤯,\nCheck Your DM 😅" });
-  //         splitAndSendResponse(content.text, interaction.user);
-  //       } else {
-  //         await interaction.editReply(`**${interaction.user.tag}:** ${question}\n**${client.user.username}:** ${content.text}\n`);
-  //       }
-  //       client.user.setActivity(activity);
-  //       const timeStamp = new Date();
-  //       const date = timeStamp.getUTCDate().toString() + '.' + timeStamp.getUTCMonth().toString() + '.' + timeStamp.getUTCFullYear().toString();
-  //       const time = timeStamp.getUTCHours().toString() + ':' + timeStamp.getUTCMinutes().toString() + ':' + timeStamp.getUTCSeconds().toString();
-  //       await db.collection('chat-history').doc(interaction.user.id)
-  //         .collection(date).doc(time).set({
-  //           timeStamp: new Date(),
-  //           userID: interaction.user.id,
-  //           user: interaction.user.tag,
-  //           question: question,
-  //           answer: content.text,
-  //           parentMessageId: content.id
-  //         });
-  //     })
-  //   } catch (e) {
-  //     console.error(chalk.red(e));
-  //   }
-  //  }
 
   async function askQuestion(question, interaction, cb) {
     const doc = await db.collection('users').doc(interaction.user.id).get();

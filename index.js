@@ -25,7 +25,7 @@ const app = express();
 //import execute from './imagineButton.js';
 import models from './models.js';
 import {
-  Client, REST, Partials,
+  Client, REST, Partials, Events,
   GatewayIntentBits, Routes,
   ActivityType, ChannelType,
   ApplicationCommandOptionType,
@@ -164,6 +164,44 @@ async function initKeyvFirestore() {
 
 
 
+const getSeed = async (messageId) => {
+  const url = `${process.env.IMAGINE_URL}seed/${messageId}`;
+  const data = JSON.stringify({
+    ref: "",
+    webhookOverride: "",
+  });
+ // console.log(url);
+  const config = {
+    method: "get",
+    url: url,
+    // params: {
+    //   expireMins: 2,
+    // },
+    headers: {
+      // "X-Requested-With": "XMLHttpRequest",
+      Authorization: `Bearer ${process.env.TNL_API_KEY}`,
+      "Content-Type": "application/json",
+      
+    },
+    data: data,
+
+  };
+  console.log(config);
+  let res;
+
+  await axios(config)
+    .then((response) => {
+      console.log(JSON.stringify(response.data));
+      res = response.data;
+    })
+    .catch((error) => {
+      console.log("error with axios get");
+      console.log(error);
+      res = "error";
+    });
+
+  return res;
+};
 
 // Main Function (Execution Starts From Here)
 async function main() {
@@ -192,12 +230,13 @@ async function main() {
     intents: [
       GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.GuildMessageReactions,
       GatewayIntentBits.GuildIntegrations,
       GatewayIntentBits.DirectMessages,
       GatewayIntentBits.DirectMessageTyping,
       GatewayIntentBits.MessageContent,
     ],
-    partials: [Partials.Channel]
+    partials: [Partials.Message, Partials.Channel,Partials.Reaction]
   });
 
   console.log('Client created..');
@@ -213,6 +252,43 @@ async function main() {
     client.user.setActivity(activity);
   });
 
+  client.on(Events.MessageReactionAdd, async (reaction, user) => { //Emoji
+    // When a reaction is received, check if the structure is partial
+  //   if (reaction.me || user.bot) return;
+  //   const emoji = reaction.emoji.name;
+  // console.log('Emoji:', emoji);
+
+    if (reaction.partial) {
+      // If the message this reaction belongs to was removed, the fetching might result in an API error which should be handled
+      try {
+        await reaction.fetch();
+      } catch (error) {
+        console.error('Something went wrong when fetching the message:', error);
+        // Return as `reaction.message.author` may be undefined/null
+        return;
+      }
+    }
+    // Now the message has been cached and is fully available
+   // console.log(`${reaction.message.author}'s message "${reaction.message.content}" gained a reaction!`);
+    // The reaction is now also fully available and the properties will be reflected accurately:
+   // console.log(`${reaction.count} user(s) have given the same reaction to this message!`);
+    if (reaction.emoji.name === '✉️') {
+      try{
+         console.log(reaction.message);
+         const customId = reaction.message.components[0].components[0].data.custom_id.split("#")[3];
+         if (customId){
+       // await getSeed(recaction.message.)
+    
+       console.log(customId);
+       const seed = await getSeed(customId);
+       reaction.message.reply(`The seed is:${seed}}`);
+         }
+      }catch(error){
+        console.log(error);
+      }
+    }
+  });
+
   // Channel Message Handler
   client.on("interactionCreate", async interaction => {
   //handle image button here I think
@@ -223,9 +299,9 @@ async function main() {
     client.user.setActivity(interaction.user.tag, { type: ActivityType.Watching });
 
     switch (interaction.commandName) {
-    //  case "ask":
-    //    ask_Interaction_Handler(interaction);
-    //    break;
+     case "ask":
+      //  ask_Interaction_Handler(interaction);
+      //  break;
     //  case "voice":
     //     voice_Interaction_Handeler(interaction);
     //     break; 
@@ -477,61 +553,120 @@ const fixConnectionIssue = (connection) => {
 };
 
 
+async function searchGif(query) {
+  try {
+    const response = await axios.get('https://api.giphy.com/v1/gifs/random', {
+      params: {
+        api_key: process.env.GIPHY_API_KEY,
+        tag: query,
+      },
+    });
 
+    const gifUrl = response.data.data.image_original_url;
+    return gifUrl;
+  } catch (error) {
+    console.error('Error searching GIF:', error);
+    return null;
+  }
+}
 
-  async function replicate_Interaction_handler(interaction) {
+async function replicate_Interaction_handler(interaction) {
+  const chatGPTAPI = await initOpenAI(messageStore);
+  try {
+    await interaction.deferReply();
+
+    const { default: Replicate } = await import('replicate');
+
+    const replicate = new Replicate({
+      auth: process.env.REPLICATE_API_KEY,
+    });
+
+    const prompt = interaction.options.getString('prompt');
+    const model = interaction.options.getString('model') || models[0].value;
+
+    const timeout = new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('Replication deadline exceeded.'));
+      }, 180000); // Adjust the timeout duration as needed
+    });
+    const output = await Promise.race([replicate.run(model, { input: { prompt } }), timeout]);
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setLabel(`Download`)
+        .setStyle(ButtonStyle.Link)
+        .setURL(`${output[0]}`)
+        .setEmoji('1101133529607327764')
+    );
+
+    const resultEmbed = new EmbedBuilder()
+      .setTitle('Image Generated')
+      .addFields({ name: 'Prompt', value: prompt })
+      .setImage(output[0])
+      .setColor('#44a3e3')
+      .setFooter({
+        text: `Requested by ${interaction.user.username}`,
+        iconURL: interaction.user.displayAvatarURL({ dynamic: true }),
+      });
+
+    const sentMessage = await interaction.editReply({
+      embeds: [resultEmbed],
+      components: [row],
+    });
+
+    // Create a filter to listen for reactions from the original message author
+    const filter = (reaction, user) => {
+      return user.id === interaction.user.id;
+    };
+
+    // Create a reaction collector to listen for new reactions
+    const collector = sentMessage.createReactionCollector({ filter, time: 60000 });
+
+    collector.on('collect', async (reaction, user) => {
+      try {
+        // Get the reacted emoji
+        const emoji = reaction.emoji.name;
+
+        // Generate a summary of the prompt using your existing ChatGPTAPI instance
+        const summaryResponse = await chatGPTAPI.sendMessage(prompt);
+        const summary = summaryResponse.choices[0].message.content;
+
+        // Generate a search query based on the summary and emoji
+        const searchQuery = `${summary} ${emoji}`;
+
+        // Search for a GIF using the search query
+        const gifUrl = await searchGif(searchQuery);
+
+        if (gifUrl) {
+          console.log('Generated GIF URL:', gifUrl);
+          // Send the GIF URL as a response to the user
+          interaction.followUp(`Here is the GIF: ${gifUrl}`);
+        } else {
+          console.log('Failed to generate GIF.');
+        }
+      } catch (error) {
+        console.log('An error occurred:', error);
+      }
+    });
+
+    collector.on('end', (collected, reason) => {
+      console.log(`Reaction collection ended: ${reason}`);
+    });
+  } catch (error) {
+    const errEmbed = new EmbedBuilder()
+      .setTitle('An error occurred')
+      .setDescription('```' + error + '```')
+      .setColor(0xe32424);
+
     try {
-      await interaction.deferReply();
-
-      const { default: Replicate } = await import('replicate');
-
-      const replicate = new Replicate({
-        auth: process.env.REPLICATE_API_KEY,
-      });
-
-      const prompt = interaction.options.getString('prompt');
-      const model = interaction.options.getString('model') || models[0].value;
-
-      const timeout = new Promise((_, reject) => {
-        setTimeout(() => {
-          reject(new Error('Replication deadline exceeded.'));
-        }, 180000); // Adjust the timeout duration as needed
-      });
-      const output = await Promise.race([replicate.run(model, { input: { prompt } }), timeout]);
-
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setLabel(`Download`)
-          .setStyle(ButtonStyle.Link)
-          .setURL(`${output[0]}`)
-          .setEmoji('1101133529607327764')
-      );
-
-      const resultEmbed = new EmbedBuilder()
-        .setTitle('Image Generated')
-        .addFields({ name: 'Prompt', value: prompt })
-        .setImage(output[0])
-        .setColor('#44a3e3')
-        .setFooter({
-          text: `Requested by ${interaction.user.username}`,
-          iconURL: interaction.user.displayAvatarURL({ dynamic: true }),
-        });
-
-      await interaction.editReply({
-        embeds: [resultEmbed],
-        components: [row],
-      });
+      interaction.editReply({ embeds: [errEmbed] });
     } catch (error) {
-      const errEmbed = new EmbedBuilder()
-        .setTitle('An error occurred')
-        .setDescription('```' + error + '```')
-        .setColor(0xe32424);
-
-    try {     
-    interaction.editReply({ embeds: [errEmbed] });
-    } catch (error){console.log("An Error occured during handling an error");}
+      console.log('An Error occurred during handling an error');
     }
   }
+}
+
+
 
   
 

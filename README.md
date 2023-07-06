@@ -79,7 +79,7 @@ This BOT uses [ChatGPT API](https://github.com/transitive-bullshit/chatgpt-api) 
 ```
 https://discord.com/api/oauth2/authorize?client_id=BOT_CLIENT_ID&permissions=2734284602433&scope=bot%20applications.commands
 ```
-https://discord.com/api/oauth2/authorize?client_id=1121574454061957210&permissions=2734284602433&scope=bot%20applications.commands
+https://discord.com/api/oauth2/authorize?client_id=1125929912352637060&permissions=2734284602433&scope=bot%20applications.commands
 1. `⭐Star` this Repo to get updates. 
 
 2. Clone this repo:

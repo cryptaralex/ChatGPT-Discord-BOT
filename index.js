@@ -10,6 +10,7 @@ import admin from 'firebase-admin';
 import Keyv from 'keyv';
 import KeyvFirestore from 'keyv-firestore';
 import express from 'express';
+import fs from 'fs';
 //import { joinVoiceChannel } from '@discordjs/voice';
 //import EventEmitter from "events";
 
@@ -24,6 +25,7 @@ import express from 'express';
 const app = express();
 //import execute from './imagineButton.js';
 import models from './models.js';
+import mlmodels from './coremlModels.js';
 import {
   Client, REST, Partials, Events,
   GatewayIntentBits, Routes,
@@ -31,6 +33,7 @@ import {
   ApplicationCommandOptionType,
   EmbedBuilder,
   ButtonBuilder,
+  AttachmentBuilder,
   ButtonStyle,
   ActionRowBuilder,
 }
@@ -51,39 +54,39 @@ let botuser; // global so everyone we can see the user deeply in function calls
 
 // Discord Slash Commands Defines
 const commands = [
-  {
-    name: 'ask',
-    description: 'Ask Anything!',
-    dm_permission: false,
-    options: [
-      {
-        name: "question",
-        description: "Your question",
-        type: 3,
-        required: true
-      }
-    ]
-  },
+  // {
+  //   name: 'replicate',
+  //   description: 'Render a 3D image or cartoon',
+  //   dm_permission: false,
+  //   options: [
+  //     {
+  //       name: "prompt",
+  //       description: "3d render or 3d cartoon",
+  //       type: 3,
+  //       required: true
+  //     },
+  //     {
+  //       name: "negative",
+  //       description: "eg. extra arms, bad quality",
+  //       type: 3,
+  //       required: false,
+  //     } ,
+  //     {
+  //       name: "seed",
+  //       description: "Seed Value (Random if not provided)",
+  //       type: 3,
+  //       required: false,
+  //     } ,
+  //     {
+  //       name: 'model',
+  //       description: 'The image model',
+  //       type: ApplicationCommandOptionType.String,
+  //       choices: mlmodels,
+  //       required: false,
+  //     },
+  //   ]
+  // },
 
-   {
-     name: 'replicate',
-     description: 'Generate an image using a prompt.',
-     options: [
-      {
-        name: 'prompt',
-        description: 'Enter your prompt',
-        type: ApplicationCommandOptionType.String,
-        required: true,
-      },
-      {
-        name: 'model',
-        description: 'The image model',
-        type: ApplicationCommandOptionType.String,
-        choices: models,
-        required: false,
-      },
-    ],
-  },
   // {
   //   name: 'voice',
   //   description: 'Connect to voice chat'
@@ -257,7 +260,7 @@ async function main() {
   //   if (reaction.me || user.bot) return;
   //   const emoji = reaction.emoji.name;
   // console.log('Emoji:', emoji);
-
+  const chatGPTAPI = await initOpenAI(messageStore);
     if (reaction.partial) {
       // If the message this reaction belongs to was removed, the fetching might result in an API error which should be handled
       try {
@@ -268,46 +271,57 @@ async function main() {
         return;
       }
     }
-    // Now the message has been cached and is fully available
-   // console.log(`${reaction.message.author}'s message "${reaction.message.content}" gained a reaction!`);
-    // The reaction is now also fully available and the properties will be reflected accurately:
-   // console.log(`${reaction.count} user(s) have given the same reaction to this message!`);
-    if (reaction.emoji.name === '✉️') {
+
+   const shouldRespond = Math.random() < 0.369; //don't always do the behavior so its random
+   const channelCheck = process.env.CHANNEL_ID.includes(reaction.message.channel.id);
+   if(channelCheck && shouldRespond){
       try{
-         console.log(reaction.message);
-         const customId = reaction.message.components[0].components[0].data.custom_id.split("#")[3];
-         if (customId){
-       // await getSeed(recaction.message.)
-    
-       console.log(customId);
-       const seed = await getSeed(customId);
-       reaction.message.reply(`The seed is:${seed}}`);
+       
+        const emoji = reaction.emoji.name;
+
+        //         // Generate a summary of the prompt using your existing ChatGPTAPI instance
+                const customPrompt = `You are a gif generator, your job is to summarize the message and create a search string for a related funny GIF, output only the search string.`
+                const summaryResponse = await chatGPTAPI.sendMessage(customPrompt + reaction.message.content);
+                console.log(summaryResponse);
+                const summary = summaryResponse.text;
+        
+        //         // Generate a search query based on the summary and emoji
+                const searchQuery = `${summary}`;
+        
+        //         // Search for a GIF using the search query
+                const gifUrl = await searchGif(searchQuery);
+        
+                if (gifUrl) {
+                    console.log('Generated GIF URL:', gifUrl);
+        //           // Send the GIF URL as a response to the user
+                   reaction.message.reply(gifUrl);
+
          }
-      }catch(error){
+      } catch(error){
         console.log(error);
       }
-    }
+   }
   });
 
   // Channel Message Handler
   client.on("interactionCreate", async interaction => {
   //handle image button here I think
-
-  
+  const channelCheck = process.env.CHANNEL_ID.includes(interaction.channel.id);
+    if(!channelCheck) return;
     if (!interaction.isChatInputCommand()) return;
 
     client.user.setActivity(interaction.user.tag, { type: ActivityType.Watching });
 
     switch (interaction.commandName) {
-     case "ask":
+    // case "ask":
       //  ask_Interaction_Handler(interaction);
       //  break;
-    //  case "voice":
-    //     voice_Interaction_Handeler(interaction);
-    //     break; 
-      case "replicate":
-        replicate_Interaction_handler(interaction);
-        break;
+      // case "render":
+      //    render_Interaction_handler(interaction);
+      //   break; 
+      //case "replicate":
+      //  render_Interaction_handler(interaction);
+       // break;
       case "ping":
         ping_Interaction_Handler(interaction);
         break;
@@ -561,97 +575,99 @@ async function searchGif(query) {
         tag: query,
       },
     });
-
-    const gifUrl = response.data.data.image_original_url;
+   if(response){
+   //  console.log(response);
+   
+    const gifUrl = response.data.data.url;
+   // console.log(gifUrl);
     return gifUrl;
+   }else{
+    return null; 
+   }
   } catch (error) {
     console.error('Error searching GIF:', error);
-    return null;
+    return error;
   }
 }
 
-async function replicate_Interaction_handler(interaction) {
+
+
+
+async function render_Interaction_handler(interaction) {
   const chatGPTAPI = await initOpenAI(messageStore);
   try {
     await interaction.deferReply();
 
-    const { default: Replicate } = await import('replicate');
+    //const { default: Replicate } = await import('replicate');
 
-    const replicate = new Replicate({
-      auth: process.env.REPLICATE_API_KEY,
-    });
+   // const replicate = new Replicate({
+    //  auth: process.env.REPLICATE_API_KEY,
+    //});
 
     const prompt = interaction.options.getString('prompt');
-    const model = interaction.options.getString('model') || models[0].value;
+    const negative = interaction.options.getString('negative') || "lowres, text, error, cropped, worst quality, low quality, jpeg artifacts, ugly, duplicate, extra fingers, mutated hands, poorly drawn hands, poorly drawn face, mutation, deformed, blurry, dehydrated, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, gross proportions, malformed limbs, missing arms, missing legs, extra arms, extra legs, fused fingers, too many fingers, long neck, username, watermark, signature";
+    //const model = interaction.options.getString('model') || models[0].value;
+    const model = interaction.options.getString('model') || mlmodels[0].value;
+    const seed = interaction.options.getString('seed') || (Math.random()*2**32>>>0).toString();
+    function sanitize(input) {
+      return input.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+  }
+  
+  const filename_start = sanitize(prompt.split(' ').slice(0, 6).join('_'));
+  const filename = filename_start + '.' + seed + '.png';
+  
 
     const timeout = new Promise((_, reject) => {
       setTimeout(() => {
         reject(new Error('Replication deadline exceeded.'));
-      }, 180000); // Adjust the timeout duration as needed
+      }, 280000); // Adjust the timeout duration as needed
     });
-    const output = await Promise.race([replicate.run(model, { input: { prompt } }), timeout]);
+    const output = await Promise.race([ axios.get('http://192.168.86.49:8081/', {
+      responseType: 'arraybuffer',  // Add this line
+      params: {
+        prompt: prompt,
+        negativePrompt: negative, 
+        model: model,
+        seed: seed,
+      }}), timeout]);
+   // console.log(output);
+    // const row = new ActionRowBuilder().addComponents(
+    //   new ButtonBuilder()
+    //     .setLabel(`Download`)
+    //     .setStyle(ButtonStyle.Link)
+    //   //  .setURL(`${output[0]}`)
+    //     .setEmoji('1101133529607327764')
+    // );
+    // const attachment = new AttachmentBuilder(output, { name: 'prompt.png' });
+    
 
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setLabel(`Download`)
-        .setStyle(ButtonStyle.Link)
-        .setURL(`${output[0]}`)
-        .setEmoji('1101133529607327764')
-    );
-
+    const buffer = Buffer.from(output.data);
+    const attachment = new AttachmentBuilder(buffer, { name: 'image.png' })
     const resultEmbed = new EmbedBuilder()
-      .setTitle('Image Generated')
-      .addFields({ name: 'Prompt', value: prompt })
-      .setImage(output[0])
-      .setColor('#44a3e3')
-      .setFooter({
-        text: `Requested by ${interaction.user.username}`,
-        iconURL: interaction.user.displayAvatarURL({ dynamic: true }),
-      });
-
+    .setTitle('Image Generated')
+    .addFields({ name: 'Prompt', value: prompt })
+    .setImage(`attachment://${filename}`)
+    .setColor('#44a3e3')
+    .setFooter({
+      text: `Requested by ${interaction.user.username}`,
+      iconURL: interaction.user.displayAvatarURL({ dynamic: true }),
+   });
+    //client.channels.cache.get(Global.fileChannel).send(attachment);
+   
+    fs.writeFileSync('test.png', output.data);
     const sentMessage = await interaction.editReply({
       embeds: [resultEmbed],
-      components: [row],
+        files: [
+                 { 
+          attachment: buffer, 
+          name: filename,
+          contentType: 'image/png',
+                 }
+        ],
     });
+  
 
-    // Create a filter to listen for reactions from the original message author
-    const filter = (reaction, user) => {
-      return user.id === interaction.user.id;
-    };
-
-    // Create a reaction collector to listen for new reactions
-    const collector = sentMessage.createReactionCollector({ filter, time: 60000 });
-
-    collector.on('collect', async (reaction, user) => {
-      try {
-        // Get the reacted emoji
-        const emoji = reaction.emoji.name;
-
-        // Generate a summary of the prompt using your existing ChatGPTAPI instance
-        const summaryResponse = await chatGPTAPI.sendMessage(prompt);
-        const summary = summaryResponse.choices[0].message.content;
-
-        // Generate a search query based on the summary and emoji
-        const searchQuery = `${summary} ${emoji}`;
-
-        // Search for a GIF using the search query
-        const gifUrl = await searchGif(searchQuery);
-
-        if (gifUrl) {
-          console.log('Generated GIF URL:', gifUrl);
-          // Send the GIF URL as a response to the user
-          interaction.followUp(`Here is the GIF: ${gifUrl}`);
-        } else {
-          console.log('Failed to generate GIF.');
-        }
-      } catch (error) {
-        console.log('An error occurred:', error);
-      }
-    });
-
-    collector.on('end', (collected, reason) => {
-      console.log(`Reaction collection ended: ${reason}`);
-    });
+   
   } catch (error) {
     const errEmbed = new EmbedBuilder()
       .setTitle('An error occurred')
@@ -665,8 +681,6 @@ async function replicate_Interaction_handler(interaction) {
     }
   }
 }
-
-
 
   
 

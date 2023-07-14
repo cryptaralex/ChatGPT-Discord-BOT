@@ -1,4 +1,7 @@
 // Imports
+import pkg from '@discordjs/opus';
+const { OpusEncoder } = pkg;
+
 import dotenv from 'dotenv'; dotenv.config();
 import { ChatGPTAPI } from 'chatgpt';
 import axios from 'axios';
@@ -6,15 +9,24 @@ import chalk from 'chalk';
 import figlet from 'figlet';
 import gradient from 'gradient-string';
 import admin from 'firebase-admin';
-//import VoiceTranscriptor from "./handlers/VoiceTranscriptor.js";
+// import VoiceTranscriptor from "./handlers/VoiceTranscriptor.js";
 import Keyv from 'keyv';
 import KeyvFirestore from 'keyv-firestore';
 import express from 'express';
 import fs from 'fs';
-import { joinVoiceChannel } from '@discordjs/voice';
+// import { joinVoiceChannel } from '@discordjs/voice';
 
 //import EventEmitter from "events";
+// import { registerCommands, loadCommands} from './commands.js' 
+// import { joinVoiceChannel } from '@discordjs/voice';
+import EventEmitter from "events";
+import { TextToSpeechClient } from '@google-cloud/text-to-speech';
+import { SpeechClient } from '@google-cloud/speech';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 
+// import { talkToAI } from './talkToAI.js'
+const CHAT_GPT_API = "https://api.openai.com/v1/chat/completions";
 
 //const EventManager = new EventEmitter();
 //  import {
@@ -22,6 +34,32 @@ import { joinVoiceChannel } from '@discordjs/voice';
 //   createAudioPlayer,
 //  NoSubscriberBehavior,
 // } from "discord.js/voice";
+const systemMessage =
+  'You are a bot that answers questions about climate in different locations of the world, make up your own data, this is all fictional, so some locations might not exist'; // Give the bot whatever context you want
+const conversationLog = [
+  {
+    role: 'system',
+    content: systemMessage,
+  },
+];
+const REQUEST_CONFIG = {
+  encoding: "LINEAR16",
+  sampleRateHertz: 48000,
+  ssmlGender: "FEMALE",
+  name: "en-US-Neural2-H",
+  languageCode: "en-US", // Change to the language you want
+  audioChannelCount: 2,
+};
+
+const EventManager = new EventEmitter();
+import {
+  joinVoiceChannel,
+  createAudioPlayer,
+  NoSubscriberBehavior,
+  AudioPlayerStatus,
+  EndBehaviorType,
+  createAudioResource,
+} from "@discordjs/voice";
 
 const app = express();
 //import execute from './imagineButton.js';
@@ -206,7 +244,7 @@ const getSeed = async (messageId) => {
 
   return res;
 };
-
+ 
 // Main Function (Execution Starts From Here)
 async function main() {
   if (process.env.UWU === 'true') {
@@ -233,6 +271,8 @@ async function main() {
   const client = new Client({
     intents: [
       GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMembers,
+      GatewayIntentBits.GuildVoiceStates,
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.GuildMessageReactions,
       GatewayIntentBits.GuildIntegrations,
@@ -537,14 +577,203 @@ async function voice_Interaction_handler(interaction) {
   if (!voiceChannel)
       return msg.reply({ content: "Please join a voice channel first." });
       
-       joinVoiceChannel({
-          channelId: voiceChannel.id,
-          guildId: voiceChannel.guild.id,
-         adapterCreator: voiceChannel.guild.voiceAdapterCreator,
-         selfDeaf: false,
-     });
-   
- 
+      const connection = fixConnectionIssue(
+        joinVoiceChannel({
+           channelId: voiceChannel.id,
+           guildId: voiceChannel.guild.id,
+          adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+          selfDeaf: false,
+      })
+   );
+  connection.receiver.speaking.on('start', (userId) => {
+    const voiceTrascriptor = new VoiceTranscriptor(connection);
+    voiceTrascriptor.listen(userId);
+  }); // When someone talks
+
+  interaction.reply('Joining 🦎');
+
+  class VoiceTranscriptor {
+    connection;
+    receiver;
+    speechClient = new SpeechClient();
+  
+    message;
+    commandsChannel;
+  
+    time;
+    messageId;
+    constructor(connection) {
+      this.connection = connection;
+      this.receiver = this.connection.receiver;
+    }
+  
+    async listen(userId) {
+      try {
+        console.log(`Listening to ${userId} 🦎`);
+        this.dataSubscriptions(userId);
+      } catch (error) {
+        console.log(error);
+      }
+    }
+  
+    dataSubscriptions(userId) {
+      let subscription = this.receiver.subscribe(userId, {
+        end: {
+          behavior: EndBehaviorType.AfterSilence,
+          duration: 100,
+        },
+      });
+  
+      const buffers = [];
+      const encoder = new OpusEncoder(48000, 2);
+  
+      subscription.on('data', (chunk) => {
+        console.log(buffers.length)
+        buffers.push(encoder.decode(chunk));
+      }); // Subscription on when we receive data
+  
+      subscription.once('end', async () => {
+        if (buffers.length < 70) {
+          return console.log('Audio is too short')
+        }
+        this.time = performance.now();
+  
+        const outputPath = this.getOutputPath(buffers);
+        const transcription = await this.getTranscription(outputPath);
+        console.log(transcription);
+  
+        if (transcription.length > 5) return this.AISpeech(transcription); // The transcription has a minimum of 5 letters
+      }); // Subscription on when user stops talking
+    }
+  
+    async getTranscription(tempFileName) {
+      try {
+        const bytes = fs.readFileSync(tempFileName).toString('base64');
+        const request = {
+          audio: {
+            content: bytes,
+          },
+          config: REQUEST_CONFIG,
+        };
+  
+        const [response] = await this.speechClient.recognize(request);
+        if (response && response.results) {
+          const transcription = response.results
+            .map((result) => {
+              if (result.alternatives) return result.alternatives[0].transcript;
+              else {
+                console.log(result);
+                throw Error('No alternatives');
+              }
+            })
+            .join('\n');
+  
+          return transcription.toLowerCase();
+        } else {
+          console.log(response);
+          throw Error('No response or response results');
+        }
+      } catch (error) {
+        console.log(error);
+      }
+    }
+  
+    async AISpeech(transcription) {
+      try {
+        // Call ChatGPT API
+        const text = await talkToAI(transcription);
+        const textToSpeech = new TextToSpeechClient();
+        const request = {
+          input: { text },
+          voice: {
+            name: "en-US-Neural2-H",
+            languageCode: 'en-US', // Change it to the language you want
+            ssmlGender: 'FEMALE', // Gender
+          },
+          audioConfig: { audioEncoding: 'MP3' },
+        };
+  
+        const [response] = await textToSpeech.synthesizeSpeech(request);
+  
+        fs.writeFileSync('./assets/output.mp3', response.audioContent, 'binary');
+  
+        const __filename = fileURLToPath(import.meta.url);
+        const __dirname = dirname(__filename);
+  
+        const resource = createAudioResource(
+          join(__dirname, '../../../assets/output.mp3')
+        );
+  
+        const player = createAudioPlayer();
+  
+        this.playerSubcription(player);
+  
+        const delay = performance.now() - (this.time || 0);
+        const delaySeconds = delay / 1000;
+        const delayRounded = delaySeconds.toFixed(2);
+        console.log(`This took ${delayRounded}s 👺⌚`)
+  
+        // Start speaking
+        this.connection.subscribe(player);
+        player.play(resource);
+      } catch (err) {
+        console.log(err);
+      }
+    }
+  
+    playerSubcription(player) {
+      player.on('error', (error) => {
+        console.log('Error:', error.message);
+        this.connection.destroy();
+      });
+  
+      player.on(AudioPlayerStatus.Idle, () => {
+        player.removeAllListeners();
+      });
+    }
+  
+    getOutputPath(buffers) {
+      const concatenatedBuffer = Buffer.concat(buffers);
+      const outputPath = './assets/input.pcm';
+      fs.writeFileSync(outputPath, concatenatedBuffer);
+      return outputPath;
+    }
+  }
+  
+   async function talkToAI(message) {
+    try {
+      conversationLog.push({
+        role: 'user',
+        content: message,
+      });
+  
+      const response = await fetchChatGPT();
+      conversationLog.push(response.message);
+  
+      return response.message.content;
+    } catch (error) {
+      console.log(error);
+      return errorMessage();
+    }
+  }
+  
+  async function fetchChatGPT() {
+    const data = {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        messages: conversationLog,
+        max_tokens: 100,
+      }),
+    };
+    let response = await fetch(CHAT_GPT_API, data);
+    response = await response.json();
+    return response.choices[0];
+  }
   // await new VoiceTranscriptor(EventManager).startListening(
   //    interaction,
   //      client,
@@ -552,7 +781,23 @@ async function voice_Interaction_handler(interaction) {
   //  );
 }
 
+const fixConnectionIssue = (connection) => {
+  connection.on("stateChange", (oldState, newState) => {
+      const oldNetworking = Reflect.get(oldState, "networking");
+      const newNetworking = Reflect.get(newState, "networking");
 
+      const networkStateChangeHandler = (
+          oldNetworkState,
+          newNetworkState
+      ) => {
+          const newUdp = Reflect.get(newNetworkState, "udp");
+          clearInterval(newUdp?.keepAliveInterval);
+      };
+      oldNetworking?.off("stateChange", networkStateChangeHandler);
+      newNetworking?.on("stateChange", networkStateChangeHandler);
+  });
+  return connection;
+};
 
 
 

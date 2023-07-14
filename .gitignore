@@ -3,6 +3,7 @@ tmp/
 temp/
 firebaseServiceAccountKey.json
 node_modules.zip
+serviceaccount.json
 
 # JetBrains WebStorm
 .idea/

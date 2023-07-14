@@ -11,15 +11,16 @@ import Keyv from 'keyv';
 import KeyvFirestore from 'keyv-firestore';
 import express from 'express';
 import fs from 'fs';
-//import { joinVoiceChannel } from '@discordjs/voice';
+import { joinVoiceChannel } from '@discordjs/voice';
+
 //import EventEmitter from "events";
 
 
 //const EventManager = new EventEmitter();
-// import {
-//   joinVoiceChannel,
+//  import {
+//  joinVoiceChannel,
 //   createAudioPlayer,
-//   NoSubscriberBehavior,
+//  NoSubscriberBehavior,
 // } from "discord.js/voice";
 
 const app = express();
@@ -51,46 +52,46 @@ const sleep = async (ms) => {
 // Defines
 const activity = '/ask && /replicate && /help'
 let botuser; // global so everyone we can see the user deeply in function calls
-
+const VoiceLanguage="en-EN";
 // Discord Slash Commands Defines
 const commands = [
-  // {
-  //   name: 'replicate',
-  //   description: 'Render a 3D image or cartoon',
-  //   dm_permission: false,
-  //   options: [
-  //     {
-  //       name: "prompt",
-  //       description: "3d render or 3d cartoon",
-  //       type: 3,
-  //       required: true
-  //     },
-  //     {
-  //       name: "negative",
-  //       description: "eg. extra arms, bad quality",
-  //       type: 3,
-  //       required: false,
-  //     } ,
-  //     {
-  //       name: "seed",
-  //       description: "Seed Value (Random if not provided)",
-  //       type: 3,
-  //       required: false,
-  //     } ,
-  //     {
-  //       name: 'model',
-  //       description: 'The image model',
-  //       type: ApplicationCommandOptionType.String,
-  //       choices: mlmodels,
-  //       required: false,
-  //     },
-  //   ]
-  // },
+  {
+    name: 'replicate',
+    description: 'Render a 3D image or cartoon',
+    dm_permission: false,
+    options: [
+      {
+        name: "prompt",
+        description: "3d render or 3d cartoon",
+        type: 3,
+        required: true
+      },
+      {
+        name: "negative",
+        description: "eg. extra arms, bad quality",
+        type: 3,
+        required: false,
+      } ,
+      {
+        name: "seed",
+        description: "Seed Value (Random if not provided)",
+        type: 3,
+        required: false,
+      } ,
+      {
+        name: 'model',
+        description: 'The image model',
+        type: ApplicationCommandOptionType.String,
+        choices: mlmodels,
+        required: false,
+      },
+    ]
+  },
 
-  // {
-  //   name: 'voice',
-  //   description: 'Connect to voice chat'
-  // },
+  {
+    name: 'voice',
+    description: 'Connect to voice chat'
+  },
   {
     name: 'ping',
     description: 'Check Websocket Heartbeat && Roundtrip Latency'
@@ -237,6 +238,7 @@ async function main() {
       GatewayIntentBits.GuildIntegrations,
       GatewayIntentBits.DirectMessages,
       GatewayIntentBits.DirectMessageTyping,
+      GatewayIntentBits.GuildVoiceStates,
       GatewayIntentBits.MessageContent,
     ],
     partials: [Partials.Message, Partials.Channel,Partials.Reaction]
@@ -319,10 +321,13 @@ async function main() {
       // case "render":
       //    render_Interaction_handler(interaction);
       //   break; 
-      //case "replicate":
-      //  render_Interaction_handler(interaction);
-       // break;
-      case "ping":
+      case "replicate":
+        render_Interaction_handler(interaction);
+        break;
+        case "voice":
+        voice_Interaction_handler(interaction);
+        break;
+       case "ping":
         ping_Interaction_Handler(interaction);
         break;
       case "help":
@@ -525,21 +530,21 @@ async function main() {
     client.user.setActivity(activity);
   }
 
-async function voice_Interaction_Handeler(interaction) {
+async function voice_Interaction_handler(interaction) {
 
 
   const voiceChannel = interaction.member.voice.channel;
   if (!voiceChannel)
       return msg.reply({ content: "Please join a voice channel first." });
-      const connection = fixConnectionIssue(
+      
        joinVoiceChannel({
           channelId: voiceChannel.id,
           guildId: voiceChannel.guild.id,
          adapterCreator: voiceChannel.guild.voiceAdapterCreator,
          selfDeaf: false,
-     })
-  );
-
+     });
+   
+ 
   // await new VoiceTranscriptor(EventManager).startListening(
   //    interaction,
   //      client,
@@ -548,23 +553,7 @@ async function voice_Interaction_Handeler(interaction) {
 }
 
 
-const fixConnectionIssue = (connection) => {
-  connection.on("stateChange", (oldState, newState) => {
-      const oldNetworking = Reflect.get(oldState, "networking");
-      const newNetworking = Reflect.get(newState, "networking");
 
-      const networkStateChangeHandler = (
-          oldNetworkState,
-          newNetworkState
-      ) => {
-          const newUdp = Reflect.get(newNetworkState, "udp");
-          clearInterval(newUdp?.keepAliveInterval);
-      };
-      oldNetworking?.off("stateChange", networkStateChangeHandler);
-      newNetworking?.on("stateChange", networkStateChangeHandler);
-  });
-  return connection;
-};
 
 
 async function searchGif(query) {
@@ -605,7 +594,7 @@ async function render_Interaction_handler(interaction) {
     //});
 
     const prompt = interaction.options.getString('prompt');
-    const negative = interaction.options.getString('negative') || "lowres, text, error, cropped, worst quality, low quality, jpeg artifacts, ugly, duplicate, extra fingers, mutated hands, poorly drawn hands, poorly drawn face, mutation, deformed, blurry, dehydrated, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, gross proportions, malformed limbs, missing arms, missing legs, extra arms, extra legs, fused fingers, too many fingers, long neck, username, watermark, signature";
+    const negative = interaction.options.getString('negative') || "butterface, extra legs, watermark, crossed fingers, too many fingers, long neck, watermark, signature";
     //const model = interaction.options.getString('model') || models[0].value;
     const model = interaction.options.getString('model') || mlmodels[0].value;
     const seed = interaction.options.getString('seed') || (Math.random()*2**32>>>0).toString();

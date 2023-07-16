@@ -54,6 +54,8 @@ const app = express();
 //import execute from './imagineButton.js';
 import models from './models.js';
 import mlmodels from './coremlModels.js';
+import dezmodels from './dezmodels.js';
+
 import {
   Client, REST, Partials, Events,
   GatewayIntentBits, Routes,
@@ -110,6 +112,38 @@ const commands = [
         description: 'The image model',
         type: ApplicationCommandOptionType.String,
         choices: mlmodels,
+        required: false,
+      },
+    ]
+  },
+  {
+    name: 'dezgo',
+    description: 'Render a 3D image or cartoon',
+    dm_permission: false,
+    options: [
+      {
+        name: "prompt",
+        description: "3d render or 3d cartoon",
+        type: 3,
+        required: true
+      },
+      {
+        name: "negative",
+        description: "eg. extra arms, bad quality",
+        type: 3,
+        required: false,
+      } ,
+      {
+        name: "seed",
+        description: "Seed Value (Random if not provided)",
+        type: 3,
+        required: false,
+      } ,
+      {
+        name: 'model',
+        description: 'The image model',
+        type: ApplicationCommandOptionType.String,
+        choices: dezmodels,
         required: false,
       },
     ]
@@ -347,9 +381,9 @@ async function main() {
     // case "ask":
       //  ask_Interaction_Handler(interaction);
       //  break;
-      // case "render":
-      //    render_Interaction_handler(interaction);
-      //   break; 
+       case "dezgo":
+        dezgo_Interaction_handler(interaction);
+        break; 
       case "replicate":
         render_Interaction_handler(interaction);
         break;
@@ -417,6 +451,75 @@ async function main() {
       }
   
       askQuestion(message.content, interaction, async (response) => {
+
+        if(response.text && response.text.includes('![Image]')){
+
+          
+        
+          try {
+
+            const regex =/!\[Image\]\[(.*?(?=\]|\>>|\)))]/;
+            const prompt = '(beautiful photo, masterpiece),' + response.text.match(regex)[1].replace(process.env.BOT_NAME,"1 girl, green eyes, perky breasts, jet black hair");
+            response.text = response.text.replace(regex,"");
+            response.text = response.text.replace('\n\n',"");
+            response.text = response.text.replace(`<<${process.env.BOT_NAME} Image📷  = `,"");
+            response.text = response.text.replace(`<<OpenJourney API Image📷 =`,"");
+            console.log(prompt);
+
+            const negative = "butterface, extra legs, watermark, crossed fingers, too many fingers, long neck, watermark, signature";
+            //const model = interaction.options.getString('model') || models[0].value;
+            const model = dezmodels[0].value;
+            const seed =  (Math.random()*2**32>>>0).toString();
+            function sanitize(input) {
+              return input.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+          }
+          
+          const filename_start = sanitize(prompt.split(' ').slice(0, 6).join('_'));
+          const filename = filename_start + '.' + seed + '.png';
+          
+        
+            const timeout = new Promise((_, reject) => {
+              setTimeout(() => {
+                reject(new Error('Replication deadline exceeded.'));
+              }, 280000); // Adjust the timeout duration as needed
+            });
+            let output;
+        try {
+          output = await Promise.race([
+            axios.get("https://api.dezgo.com/text2image", {
+              responseType: "arraybuffer",
+              headers: {
+                "X-Dezgo-Key": `${process.env.DEZGO_API_KEY}`,
+                "Content-Type": "application/json",
+              },
+              data: {
+                prompt: prompt,
+                negative_prompt: negative,
+                model: model,
+                seed: seed,
+                width: 512,
+                height: 768,
+              },
+            }),
+            timeout,
+          ]);
+        } catch (error) {
+          console.error(error);
+        }
+        const buffer = Buffer.from(output.data);
+            //const output = await Promise.race([replicate.run(model, { input: { prompt } }), timeout]);
+            await message.channel.send({files: [
+              { 
+       attachment: buffer, 
+       name: filename,
+       contentType: 'image/png',
+              }]});
+           //console.log("output would be here");
+          }catch(error){
+            console.log(error);
+          }      
+        }
+
         if (!response.text) {
           if (response.length >= process.env.DISCORD_MAX_RESPONSE_LENGTH && dmcheck) {
             splitAndSendChannelResponse(response, message.channel)
@@ -451,46 +554,7 @@ async function main() {
             await message.channel.send(response.text);
           }
         }
-        if(response.text.includes('![Image]')){
-
-          
         
-          try {
-            //const regex = /!\[Image\]\[(.*?(?=\]|\)))/;
-            const regex = /!\[Image\]\[(.*?(?=\]|\>>|\)))/;
-            
-
-            const prompt = 'mdjrny-v4 style, photo,' + response.text.match(regex)[1];
-          
-            console.log(prompt);
-      
-            const { default: Replicate } = await import('replicate');
-      
-            const replicate = new Replicate({
-              auth: process.env.REPLICATE_API_KEY,
-            });
-      
-        
-            const model = models[0].value;
-      
-            const timeout = new Promise((_, reject) => {
-              setTimeout(() => {
-                reject(new Error('Replication deadline exceeded.'));
-              }, 90000); // Adjust the timeout duration as needed
-            });
-            const output = await Promise.race([replicate.run(model, { input: { prompt } }), timeout]);
-            await message.channel.send(output[0]);
-           //console.log("output would be here");
-          }catch(error){
-            console.log(error);
-          }      
-
-
-
-
-
-          console.log("found the image tag in the response");
-        }
       
 
 
@@ -849,6 +913,99 @@ async function render_Interaction_handler(interaction) {
         model: model,
         seed: seed,
       }}), timeout]);
+
+    const buffer = Buffer.from(output.data);
+    const attachment = new AttachmentBuilder(buffer, { name: 'image.png' })
+    const resultEmbed = new EmbedBuilder()
+    .setTitle('Image Generated')
+    .addFields({ name: 'Prompt', value: prompt })
+    .setImage(`attachment://${filename}`)
+    .setColor('#44a3e3')
+    .setFooter({
+      text: `Requested by ${interaction.user.username}`,
+      iconURL: interaction.user.displayAvatarURL({ dynamic: true }),
+   });
+    //client.channels.cache.get(Global.fileChannel).send(attachment);
+   
+    fs.writeFileSync('test.png', output.data);
+    const sentMessage = await interaction.editReply({
+      embeds: [resultEmbed],
+        files: [
+                 { 
+          attachment: buffer, 
+          name: filename,
+          contentType: 'image/png',
+                 }
+        ],
+    });
+  
+
+   
+  } catch (error) {
+    const errEmbed = new EmbedBuilder()
+      .setTitle('An error occurred')
+      .setDescription('```' + error + '```')
+      .setColor(0xe32424);
+
+    try {
+      interaction.editReply({ embeds: [errEmbed] });
+    } catch (error) {
+      console.log('An Error occurred during handling an error');
+    }
+  }
+}
+
+async function dezgo_Interaction_handler(interaction) {
+  const chatGPTAPI = await initOpenAI(messageStore);
+  try {
+    await interaction.deferReply();
+
+    //const { default: Replicate } = await import('replicate');
+
+   // const replicate = new Replicate({
+    //  auth: process.env.REPLICATE_API_KEY,
+    //});
+
+    const prompt = interaction.options.getString('prompt');
+    const negative = interaction.options.getString('negative') || "butterface, extra legs, watermark, crossed fingers, too many fingers, long neck, watermark, signature";
+    //const model = interaction.options.getString('model') || models[0].value;
+    const model = interaction.options.getString('model') || dezmodels[0].value;
+    const seed = interaction.options.getString('seed') || (Math.random()*2**32>>>0).toString();
+    function sanitize(input) {
+      return input.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+  }
+  
+  const filename_start = sanitize(prompt.split(' ').slice(0, 6).join('_'));
+  const filename = filename_start + '.' + seed + '.png';
+  
+
+    const timeout = new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('Replication deadline exceeded.'));
+      }, 280000); // Adjust the timeout duration as needed
+    });
+    let output;
+try {
+  output = await Promise.race([
+    axios.get("https://api.dezgo.com/text2image", {
+      responseType: "arraybuffer",
+      headers: {
+        "X-Dezgo-Key": `${process.env.DEZGO_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      data: {
+        prompt: prompt,
+        negative_prompt: negative,
+        model: model,
+        seed: seed,
+      },
+    }),
+    timeout,
+  ]);
+} catch (error) {
+  console.error(error);
+}
+      
 
     const buffer = Buffer.from(output.data);
     const attachment = new AttachmentBuilder(buffer, { name: 'image.png' })

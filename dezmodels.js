@@ -1,44 +1,61 @@
 const dezmodels = [
   
+  {
+    name: 'Deliberate 2',
+    value:
+      'deliberate_2',
+  },
+  {
+      name: 'absolute_reality_1_6',
+      value: 'absolute_reality_1_6',
+  },
+ 
     {
-      name: 'Deliberate 2',
+      name: 'anything_5_0',
       value:
-        'deliberate_2',
+        'anything_5_0',
     },
-    {
-        name: 'Custom NSFW Merge',
-        value: 'MyMerge-v1-Original-512x768',
-    },
-    {
-        name: '3DKX - Landscape',
-        value:
-          '3DKX_V2_original_768x512',
-      },
-      {
-        name: 'Amateur and Pussy Mix',
-        value:
-          'amatuer-godpussy',
-      },
-   
-    {
-      name: 'Openjourney - Robo Diffision',
-      value: 'Openjourney-Robo-Diffusion-Merge-v1_ema-vae_original_compiled',
-    }, 
-    {
-        name: 'Meina Henai - v4',
-        value: 'meinahentai_v4_original_768x768_cn',
-    },
-    {
-        name: 'Chilloput NSFW Mix',
-        value: 'chilloutmix-ni_original_512x768',
-    },
-    {
-        name: 'Stable Diffusion 1.5',
-        value:
-          'coreml-stable-diffusion-v1-5_original_compiled',
-    },
-    
-  ];
+ 
+  {
+    name: 'cyberrealistic_3_1',
+    value: 'cyberrealistic_3_1',
+  }, 
+  {
+      name: 'dreamshaper_7',
+      value: 'dreamshaper_7',
+  },
+  {
+      name: 'eimis_anime_diffusion',
+      value: 'eimis_anime_diffusion',
+  },
+  {
+      name: 'inkpunk_diffusion "nvinkpunk"',
+      value:
+        'inkpunk_diffusion',
+      
+  },
+  {
+      name: 'stable_diffusion_voxelart',
+      value:
+        'stable_diffusion_voxelart',
+      
+  }, {
+      name: 'vectorartz_diffusion',
+      value:
+        'vectorartz_diffusion',
+      
+  }, {
+      name: 'nightmareshaper',
+      value:
+        'nightmareshaper',
+      
+  }, {
+      name: 'future_diffusion',
+      value:
+        'future_diffusion',
+      
+  },
   
-  export default dezmodels;
-  
+];
+
+export default dezmodels;

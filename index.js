@@ -17,7 +17,7 @@ import fs from 'fs';
 import voice from 'elevenlabs-node';
 import { SpeechClient } from '@google-cloud/speech';
 
-
+const genesisTraits = JSON.parse(fs.readFileSync('./inscriptions.json', 'utf8'));
 // import { talkToAI } from './talkToAI.js'
 const CHAT_GPT_API = "https://api.openai.com/v1/chat/completions";
 
@@ -381,15 +381,15 @@ async function main() {
     // case "ask":
       //  ask_Interaction_Handler(interaction);
       //  break;
-       case "dezgo":
-        dezgo_Interaction_handler(interaction);
-        break; 
-      case "replicate":
-        render_Interaction_handler(interaction);
-        break;
-        case "voice":
-        voice_Interaction_handler(interaction);
-        break;
+      // case "dezgo":
+     //   dezgo_Interaction_handler(interaction);
+     //   break; 
+    //  case "replicate":
+     //   render_Interaction_handler(interaction);
+     //   break;
+     //   case "voice":
+    //    voice_Interaction_handler(interaction);
+     //   break;
        case "ping":
         ping_Interaction_Handler(interaction);
         break;
@@ -452,14 +452,18 @@ async function main() {
   
       askQuestion(message.content, interaction, async (response) => {
 
-        if(response.text && response.text.includes('![Image]')){
+        if(response.text && response.text.includes('![IMAGE]')){
 
           
         
           try {
-
-            const regex =/!\[Image\]\[(.*?(?=\]|\>>|\)))]/;
-            const prompt = '(beautiful photo, masterpiece),' + response.text.match(regex)[1].replace(process.env.BOT_NAME,"1 girl, green eyes, perky breasts, jet black hair");
+            const botID = process.env.BOT_ID;
+            const botInfo = genesisTraits.find((element) => element.id===botID);
+           
+      
+        
+            const regex =/!\[IMAGE\]\[(.*?(?=\]|\>>|\)))]/;
+            const prompt = '(beautiful photo, masterpiece),' + response.text.match(regex)[1].replace(process.env.BOT_NAME,`1 girl, ${botInfo.meta.attributes.find((attr) => attr.trait_type==='eyes').value} eyes, ${botInfo.meta.attributes.find((attr) => attr.trait_type==='bust').value} breasts, ${botInfo.meta.attributes.find((attr) => attr.trait_type==='hair').value} hair,`);
             response.text = response.text.replace(regex,"");
             response.text = response.text.replace('\n\n',"");
             response.text = response.text.replace(`<<${process.env.BOT_NAME} Image📷  = `,"");
@@ -1054,32 +1058,39 @@ try {
     const doc = await db.collection('users').doc(interaction.user.id).get();
     const currentDate = new Date().toISOString();
     const systemMessage = process.env.SYSTEM_MESSAGE;
-   
-    const botName = process.env.BOT_NAME;
-    const botFood = process.env.BOT_FOOD;
-    const botBriggs = process.env.BOT_PERSONALITY;
 
-    console.log(botBriggs);
+
+
     
-    const neralyfinalSystemMessage = systemMessage
-      .replace(/\[NAME\]/g, botName)
-      .replace(/\[FOOD\]/g, botFood);
+    const botID = process.env.BOT_ID;
+    const botInfo = genesisTraits.find((element) => element.id===botID);
+    const botName = botInfo.meta.attributes.find((attr) => attr.trait_type==='Name').value;
+  
+    
+    const botBriggs = 'Your Personality type is ' + botInfo.meta.attributes.find((attr) => attr.trait_type==='Personality').value +
+     '. You love '+ botInfo.meta.attributes.find((attr) => attr.trait_type==='food').value + 
+     '. You have ' + botInfo.meta.attributes.find((attr) => attr.trait_type==='eyes').value + ' eyes, ' +
+     botInfo.meta.attributes.find((attr) => attr.trait_type==='hair').value + ' hair,' +
+     botInfo.meta.attributes.find((attr) => attr.trait_type==='bust').value + ' breasts, You stand ' +
+     botInfo.meta.attributes.find((attr) => attr.trait_type==='height').value + ' tall.';
 
-    const systemStart = `You are ${botName} using the tag <@${botuser}> in the discord server. ${botName} is a vibrant human with the ${botBriggs}.`;
-    const finalSystemMessage = systemStart + neralyfinalSystemMessage;
+    
+    const finalSystemMessage = systemMessage
+      .replace(/\[NAME\]/g, botName);
+
+  
 
 
     const systemPrompt = process.env.PROMPT_TEXT;
-    const customPrompt = systemPrompt
-      .replace(/\[NAME\]/g, botName)
-      .replace(/\[FOOD\]/g, botFood);
+    const customPrompt = systemPrompt.replace(/\[NAME\]/g, botName);
+
+      const extraPrompt = `You are <@${botuser}> in the discord server. People will tag you with <@${botuser}> as that's your name there and you will respond. Examples: user: Hi <@${botuser}> ! Assistant: Hello ${interaction.user.tag}, I hope you are having a wonderful day.\n`
 
 
-    const extraPrompt = `You are <@${botuser}> in the discord server. People will tag you with <@${botuser}> as that's your name there and you will respond. Examples: user: Hi <@${botuser}> ! Assistant: Hello ${interaction.user.tag}, I hope you are having a wonderful day.\n USER MESSAGE FOLLOWS:\n`
 
     if (!doc.exists) {
-      api.sendMessage(customPrompt + extraPrompt + question, {
-        systemMessage: finalSystemMessage
+      api.sendMessage(finalSystemMessage + botBriggs + customPrompt + question, {
+        systemMessage: finalSystemMessage + botBriggs + customPrompt + extraPrompt
       }).then((response) => {
         db.collection('users').doc(interaction.user.id).set({
           timeStamp: new Date(),
@@ -1093,9 +1104,9 @@ try {
         console.log(chalk.red("AskQuestion Error:" + err));
       })
     } else {
-      api.sendMessage(customPrompt + extraPrompt + question, {
+      api.sendMessage(customPrompt + question, {
         parentMessageId: doc.data().parentMessageId,
-        systemMessage: finalSystemMessage
+        systemMessage: finalSystemMessage + customPrompt  + extraPrompt
       }).then((response) => {
         db.collection('users').doc(interaction.user.id).set({
           timeStamp: new Date(),

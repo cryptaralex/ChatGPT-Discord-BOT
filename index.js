@@ -111,43 +111,43 @@ const commands = [
         name: 'model',
         description: 'The image model',
         type: ApplicationCommandOptionType.String,
-        choices: mlmodels,
-        required: false,
-      },
-    ]
-  },
-  {
-    name: 'dezgo',
-    description: 'Render a 3D image or cartoon',
-    dm_permission: false,
-    options: [
-      {
-        name: "prompt",
-        description: "3d render or 3d cartoon",
-        type: 3,
-        required: true
-      },
-      {
-        name: "negative",
-        description: "eg. extra arms, bad quality",
-        type: 3,
-        required: false,
-      } ,
-      {
-        name: "seed",
-        description: "Seed Value (Random if not provided)",
-        type: 3,
-        required: false,
-      } ,
-      {
-        name: 'model',
-        description: 'The image model',
-        type: ApplicationCommandOptionType.String,
         choices: dezmodels,
         required: false,
       },
     ]
   },
+  // {
+  //   name: 'dezgo',
+  //   description: 'Render a 3D image or cartoon',
+  //   dm_permission: false,
+  //   options: [
+  //     {
+  //       name: "prompt",
+  //       description: "3d render or 3d cartoon",
+  //       type: 3,
+  //       required: true
+  //     },
+  //     {
+  //       name: "negative",
+  //       description: "eg. extra arms, bad quality",
+  //       type: 3,
+  //       required: false,
+  //     } ,
+  //     {
+  //       name: "seed",
+  //       description: "Seed Value (Random if not provided)",
+  //       type: 3,
+  //       required: false,
+  //     } ,
+  //     {
+  //       name: 'model',
+  //       description: 'The image model',
+  //       type: ApplicationCommandOptionType.String,
+  //       choices: dezmodels,
+  //       required: false,
+  //     },
+  //   ]
+  // },
 
   {
     name: 'voice',
@@ -383,13 +383,13 @@ async function main() {
       //  break;
       // case "dezgo":
      //   dezgo_Interaction_handler(interaction);
-     //   break; 
-    //  case "replicate":
-     //   render_Interaction_handler(interaction);
-     //   break;
-     //   case "voice":
-    //    voice_Interaction_handler(interaction);
-     //   break;
+    //  //   break; 
+    //   case "replicate":
+    //     dezgo_Interaction_handler(interaction);
+    //      break;
+    //     case "voice":
+    //     voice_Interaction_handler(interaction);
+    //     break;
        case "ping":
         ping_Interaction_Handler(interaction);
         break;
@@ -408,7 +408,10 @@ async function main() {
   client.on("messageCreate", async message => {
     const dmCheck = process.env.DIRECT_MESSAGES === "true" && message.channel.type === ChannelType.DM;
     const channelCheck = process.env.CHANNEL_ID.includes(message.channel.id);
-    const isMentioned = message.mentions.has(client.user) || message.content.toLowerCase().includes(process.env.BOT_NAME.toLowerCase());
+    const botID = process.env.BOT_ID;
+    const botInfo = genesisTraits.find((element) => element.id===botID);
+    const botName = botInfo.meta.attributes.find((attr) => attr.trait_type==='Name').value;
+    const isMentioned = message.mentions.has(client.user) || message.content.toLowerCase().includes(botName.toLowerCase());
     const shouldRespond = Math.random() < 0.0169 || isMentioned;
   
     if (message.author.bot || (!dmCheck && (!channelCheck || !shouldRespond))) {
@@ -459,14 +462,16 @@ async function main() {
           try {
             const botID = process.env.BOT_ID;
             const botInfo = genesisTraits.find((element) => element.id===botID);
+            const botName = botInfo.meta.attributes.find((attr) => attr.trait_type==='Name').value;
+            
            
       
         
             const regex =/!\[IMAGE\]\[(.*?(?=\]|\>>|\)))]/;
-            const prompt = '(beautiful photo, masterpiece),' + response.text.match(regex)[1].replace(process.env.BOT_NAME,`1 girl, ${botInfo.meta.attributes.find((attr) => attr.trait_type==='eyes').value} eyes, ${botInfo.meta.attributes.find((attr) => attr.trait_type==='bust').value} breasts, ${botInfo.meta.attributes.find((attr) => attr.trait_type==='hair').value} hair,`);
+            const prompt = '(beautiful photo, masterpiece),' + response.text.match(regex)[1].replace(botName,`1 girl, ${botInfo.meta.attributes.find((attr) => attr.trait_type==='eyes').value} eyes, ${botInfo.meta.attributes.find((attr) => attr.trait_type==='bust').value} breasts, ${botInfo.meta.attributes.find((attr) => attr.trait_type==='hair').value} hair,`);
             response.text = response.text.replace(regex,"");
             response.text = response.text.replace('\n\n',"");
-            response.text = response.text.replace(`<<${process.env.BOT_NAME} Image📷  = `,"");
+            response.text = response.text.replace(`<<${botName} Image📷  = `,"");
             response.text = response.text.replace(`<<OpenJourney API Image📷 =`,"");
             console.log(prompt);
 
@@ -502,7 +507,7 @@ async function main() {
                 model: model,
                 seed: seed,
                 width: 512,
-                height: 768,
+                height: 512,
               },
             }),
             timeout,
@@ -1089,7 +1094,7 @@ try {
 
 
     if (!doc.exists) {
-      api.sendMessage(finalSystemMessage + botBriggs + customPrompt + extraPrompt+ userinfo + question, {
+      api.sendMessage(customPrompt + userinfo + question, {
         systemMessage: finalSystemMessage + botBriggs + customPrompt + extraPrompt + userinfo
       }).then((response) => {
         db.collection('users').doc(interaction.user.id).set({

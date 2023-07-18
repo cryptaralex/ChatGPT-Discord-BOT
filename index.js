@@ -1084,13 +1084,13 @@ try {
     const systemPrompt = process.env.PROMPT_TEXT;
     const customPrompt = systemPrompt.replace(/\[NAME\]/g, botName);
 
-      const extraPrompt = `You are <@${botuser}> in the discord server. People will tag you with <@${botuser}> as that's your name there and you will respond. Examples: user: Hi <@${botuser}> ! Assistant: Hello ${interaction.user.tag}, I hope you are having a wonderful day.\n`
-
+      const extraPrompt = `You are <@${botuser}> in the discord server. People will tag you with <@${botuser}> as that's your name there and you will respond. Examples: user: Hi <@${botuser}> ! Assistant: Hello <@${interaction.user.id}>, I hope you are having a wonderful day.\n `;
+      const userinfo = `Current user is named <@${interaction.user.id}> with the discord tag <@${interaction.user.id}> `;
 
 
     if (!doc.exists) {
-      api.sendMessage(finalSystemMessage + botBriggs + customPrompt + question, {
-        systemMessage: finalSystemMessage + botBriggs + customPrompt + extraPrompt
+      api.sendMessage(finalSystemMessage + botBriggs + customPrompt + extraPrompt+ userinfo + question, {
+        systemMessage: finalSystemMessage + botBriggs + customPrompt + extraPrompt + userinfo
       }).then((response) => {
         db.collection('users').doc(interaction.user.id).set({
           timeStamp: new Date(),
@@ -1104,9 +1104,9 @@ try {
         console.log(chalk.red("AskQuestion Error:" + err));
       })
     } else {
-      api.sendMessage(customPrompt + question, {
+      api.sendMessage(customPrompt + userinfo + question, {
         parentMessageId: doc.data().parentMessageId,
-        systemMessage: finalSystemMessage + customPrompt  + extraPrompt
+        systemMessage: finalSystemMessage + customPrompt 
       }).then((response) => {
         db.collection('users').doc(interaction.user.id).set({
           timeStamp: new Date(),

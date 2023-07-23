@@ -149,10 +149,10 @@ const commands = [
   //   ]
   // },
 
-  {
-    name: 'voice',
-    description: 'Connect to voice chat'
-  },
+  // {
+  //   name: 'voice',
+  //   description: 'Connect to voice chat'
+  // },
   {
     name: 'ping',
     description: 'Check Websocket Heartbeat && Roundtrip Latency'

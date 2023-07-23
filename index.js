@@ -79,43 +79,43 @@ const sleep = async (ms) => {
 };
 
 // Defines
-const activity = '/ask && /replicate && /help'
+const activity = 'DM, Tag me or use /help'
 let botuser; // global so everyone we can see the user deeply in function calls
 const VoiceLanguage="en-EN";
 // Discord Slash Commands Defines
 const commands = [
   {
-    name: 'replicate',
-    description: 'Render a 3D image or cartoon',
-    dm_permission: false,
-    options: [
-      {
-        name: "prompt",
-        description: "3d render or 3d cartoon",
-        type: 3,
-        required: true
-      },
-      {
-        name: "negative",
-        description: "eg. extra arms, bad quality",
-        type: 3,
-        required: false,
-      } ,
-      {
-        name: "seed",
-        description: "Seed Value (Random if not provided)",
-        type: 3,
-        required: false,
-      } ,
-      {
-        name: 'model',
-        description: 'The image model',
-        type: ApplicationCommandOptionType.String,
-        choices: dezmodels,
-        required: false,
-      },
-    ]
-  },
+  //   name: 'replicate',
+  //   description: 'Render a 3D image or cartoon',
+  //   dm_permission: false,
+  //   options: [
+  //     {
+  //       name: "prompt",
+  //       description: "3d render or 3d cartoon",
+  //       type: 3,
+  //       required: true
+  //     },
+  //     {
+  //       name: "negative",
+  //       description: "eg. extra arms, bad quality",
+  //       type: 3,
+  //       required: false,
+  //     } ,
+  //     {
+  //       name: "seed",
+  //       description: "Seed Value (Random if not provided)",
+  //       type: 3,
+  //       required: false,
+  //     } ,
+  //     {
+  //       name: 'model',
+  //       description: 'The image model',
+  //       type: ApplicationCommandOptionType.String,
+  //       choices: dezmodels,
+  //       required: false,
+  //     },
+  //   ]
+  // },
   // {
   //   name: 'dezgo',
   //   description: 'Render a 3D image or cartoon',
@@ -149,10 +149,10 @@ const commands = [
   //   ]
   // },
 
-   {
-     name: 'voice',
-     description: 'Connect to voice chat'
-   },
+  //  {
+  //    name: 'voice',
+  //    description: 'Connect to voice chat'
+  //  },
   {
     name: 'ping',
     description: 'Check Websocket Heartbeat && Roundtrip Latency'
@@ -384,12 +384,12 @@ async function main() {
       // case "dezgo":
      //   dezgo_Interaction_handler(interaction);
     //  //   break; 
-       case "replicate":
-         dezgo_Interaction_handler(interaction);
-          break;
-         case "voice":
-         voice_Interaction_handler(interaction);
-         break;
+      //  case "replicate":
+      //    dezgo_Interaction_handler(interaction);
+      //     break;
+      //    case "voice":
+      //    voice_Interaction_handler(interaction);
+      //    break;
        case "ping":
         ping_Interaction_Handler(interaction);
         break;

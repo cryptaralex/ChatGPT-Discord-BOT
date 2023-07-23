@@ -149,10 +149,10 @@ const commands = [
   //   ]
   // },
 
-  // {
-  //   name: 'voice',
-  //   description: 'Connect to voice chat'
-  // },
+   {
+     name: 'voice',
+     description: 'Connect to voice chat'
+   },
   {
     name: 'ping',
     description: 'Check Websocket Heartbeat && Roundtrip Latency'
@@ -384,12 +384,12 @@ async function main() {
       // case "dezgo":
      //   dezgo_Interaction_handler(interaction);
     //  //   break; 
-    //   case "replicate":
-    //     dezgo_Interaction_handler(interaction);
-    //      break;
-    //     case "voice":
-    //     voice_Interaction_handler(interaction);
-    //     break;
+       case "replicate":
+         dezgo_Interaction_handler(interaction);
+          break;
+         case "voice":
+         voice_Interaction_handler(interaction);
+         break;
        case "ping":
         ping_Interaction_Handler(interaction);
         break;

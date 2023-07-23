@@ -84,7 +84,7 @@ let botuser; // global so everyone we can see the user deeply in function calls
 const VoiceLanguage="en-EN";
 // Discord Slash Commands Defines
 const commands = [
-  {
+  //{
   //   name: 'replicate',
   //   description: 'Render a 3D image or cartoon',
   //   dm_permission: false,

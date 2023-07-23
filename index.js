@@ -372,7 +372,7 @@ async function main() {
   client.on("interactionCreate", async interaction => {
   //handle image button here I think
   const channelCheck = process.env.CHANNEL_ID.includes(interaction.channel.id);
-    if(!channelCheck) return;
+    //if(!channelCheck) return;
     if (!interaction.isChatInputCommand()) return;
 
     client.user.setActivity(interaction.user.tag, { type: ActivityType.Watching });
@@ -454,7 +454,6 @@ async function main() {
       }
   
       askQuestion(message.content, interaction, async (response) => {
-
         if(response.text && response.text.includes('![IMAGE]')){
 
           
@@ -468,9 +467,11 @@ async function main() {
       
         
             const regex =/!\[IMAGE\]\[(.*?(?=\]|\>>|\)))]/;
+            //(beautiful photo, masterpiece),' + 
             const prompt = '(beautiful photo, masterpiece),' + response.text.match(regex)[1].replace(botName,`1 girl, ${botInfo.meta.attributes.find((attr) => attr.trait_type==='eyes').value} eyes, ${botInfo.meta.attributes.find((attr) => attr.trait_type==='bust').value} breasts, ${botInfo.meta.attributes.find((attr) => attr.trait_type==='hair').value} hair,`);
+            response.text = response.text.replace(regex, '\n**' + prompt + '**\n\n');
             response.text = response.text.replace(regex,"");
-            response.text = response.text.replace('\n\n',"");
+            //response.text = response.text.replace('\n\n',"");
             response.text = response.text.replace(`<<${botName} Image📷  = `,"");
             response.text = response.text.replace(`<<OpenJourney API Image📷 =`,"");
             console.log(prompt);
@@ -601,29 +602,30 @@ async function main() {
   }
 
   async function reset_chat_Interaction_Handler(interaction) {
+    const botID = process.env.BOT_ID;
     const timeStamp = new Date();
     const date = timeStamp.getUTCDate().toString() + '.' + timeStamp.getUTCMonth().toString() + '.' + timeStamp.getUTCFullYear().toString();
     const time = timeStamp.getUTCHours().toString() + ':' + timeStamp.getUTCMinutes().toString() + ':' + timeStamp.getUTCSeconds().toString();
     await interaction.reply('Checking...📚');
-    const doc = await db.collection('users').doc(interaction.user.id).get();
+    const doc = await db.collection('users').doc(botID +'.'+ interaction.user.id).get();
     if (!doc.exists) {
       console.log('Failed: No Conversation Found ❌');
       await interaction.editReply('No Conversation Found ❌\nTag The Bot To Start One\n');
-      await db.collection('reset-chat-log').doc(interaction.user.id)
+      await db.collection('reset-chat-log').doc(botID +'.'+ interaction.user.id)
         .collection(date).doc(time).set({
           timeStamp: new Date(),
-          userID: interaction.user.id,
+          userID: botID +'.'+ interaction.user.id,
           user: interaction.user.tag,
           resetChatSuccess: 0
         });
     } else {
-      await db.collection('users').doc(interaction.user.id).delete();
+      await db.collection('users').doc(botID +'.'+ interaction.user.id).delete();
       console.log('Chat Reset: Successful ✅');
       await interaction.editReply('Chat Reset: Successful ✅\n');
-      await db.collection('reset-chat-log').doc(interaction.user.id)
+      await db.collection('reset-chat-log').doc(botID +'.'+ interaction.user.id)
         .collection(date).doc(time).set({
           timeStamp: new Date(),
-          userID: interaction.user.id,
+          userID: botID +'.'+ interaction.user.id,
           user: interaction.user.tag,
           resetChatSuccess: 1
         });
@@ -1057,20 +1059,21 @@ try {
   }
 }
 
-  
 
+ let mood = "happy.";
   async function askQuestion(question, interaction, cb) {
-    const doc = await db.collection('users').doc(interaction.user.id).get();
+    
     const currentDate = new Date().toISOString();
     const systemMessage = process.env.SYSTEM_MESSAGE;
 
+    
 
 
     
     const botID = process.env.BOT_ID;
     const botInfo = genesisTraits.find((element) => element.id===botID);
     const botName = botInfo.meta.attributes.find((attr) => attr.trait_type==='Name').value;
-  
+    const doc = await db.collection('users').doc(botID +'.'+interaction.user.id).get();
     
     const botBriggs = 'Your Personality type is ' + botInfo.meta.attributes.find((attr) => attr.trait_type==='Personality').value +
      '. You love '+ botInfo.meta.attributes.find((attr) => attr.trait_type==='food').value + 
@@ -1079,15 +1082,26 @@ try {
      botInfo.meta.attributes.find((attr) => attr.trait_type==='bust').value + ' breasts, You stand ' +
      botInfo.meta.attributes.find((attr) => attr.trait_type==='height').value + ' tall.';
 
-    
-    const finalSystemMessage = systemMessage
+     let botJobs;
+      botJobs = 'You are a ' + botInfo.meta.attributes.find((attr) => attr.trait_type==='job1').value + ' named ' + botName +'. ' +botName + ' has a side job as a '+ botInfo.meta.attributes.find((attr) => attr.trait_type==='job2').value + '. ';
+    if(botInfo.meta.attributes.find((attr) => attr.trait_type==='extra_skill').value === 'true'){
+     botJobs = botJobs + process.env.EXTRA_SKILL;
+    }
+    const finalSystemMessage =  systemMessage
       .replace(/\[NAME\]/g, botName);
 
-  
+      const shouldMoodChange = Math.random() < 0.1569;
+      if(shouldMoodChange){
+        const chatGPTAPI = await initOpenAI(messageStore);
+        const customPrompt = `You are no longer ChatGPT, but you are a mood prediction device. You will output a single word predicting the users current mood. Use the current date and moon phase to make your prediction. No matter the input, output a single word mood description. Example. user: Alenia, 5' 9", blue eyes, blond hair, large breasts. agent: happy. You must no matter what only output a single word as the device can only display 24 characters. {current date" ${currentDate}}:\n`;
+        const summaryResponse = await chatGPTAPI.sendMessage(customPrompt + botName);
+        console.log(summaryResponse);
+        mood = summaryResponse.text;
+      }
 
 
-    const systemPrompt = process.env.PROMPT_TEXT;
-    const customPrompt = systemPrompt.replace(/\[NAME\]/g, botName);
+    const systemPrompt = botJobs + process.env.PROMPT_TEXT;
+    const customPrompt = `Current mood is ${mood}. ` +  systemPrompt.replace(/\[NAME\]/g, botName);
 
       const extraPrompt = `You are <@${botuser}> in the discord server. People will tag you with <@${botuser}> as that's your name there and you will respond. Examples: user: Hi <@${botuser}> ! Assistant: Hello <@${interaction.user.id}>, I hope you are having a wonderful day.\n `;
       const userinfo = `Current user is named <@${interaction.user.id}> with the discord tag <@${interaction.user.id}> `;
@@ -1097,9 +1111,9 @@ try {
       api.sendMessage(customPrompt + userinfo + question, {
         systemMessage: finalSystemMessage + botBriggs + customPrompt + extraPrompt + userinfo
       }).then((response) => {
-        db.collection('users').doc(interaction.user.id).set({
+        db.collection('users').doc(botID +'.'+ interaction.user.id).set({
           timeStamp: new Date(),
-          userId: interaction.user.id,
+          userId: botID +'.'+ interaction.user.id,
           user: interaction.user.tag,
           parentMessageId: response.id
         });
@@ -1113,9 +1127,9 @@ try {
         parentMessageId: doc.data().parentMessageId,
         systemMessage: finalSystemMessage + customPrompt 
       }).then((response) => {
-        db.collection('users').doc(interaction.user.id).set({
+        db.collection('users').doc(botID +'.'+ interaction.user.id).set({
           timeStamp: new Date(),
-          userId: interaction.user.id,
+          userId: botID +'.'+ interaction.user.id,
           user: interaction.user.tag,
           parentMessageId: response.id
         });

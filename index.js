@@ -469,7 +469,7 @@ async function main() {
             const regex =/!\[IMAGE\]\[(.*?(?=\]|\>>|\)))]/;
             //(beautiful photo, masterpiece),' + 
             const prompt = '(beautiful photo, masterpiece),' + response.text.match(regex)[1].replace(botName,`1 girl, ${botInfo.meta.attributes.find((attr) => attr.trait_type==='eyes').value} eyes, ${botInfo.meta.attributes.find((attr) => attr.trait_type==='bust').value} breasts, ${botInfo.meta.attributes.find((attr) => attr.trait_type==='hair').value} hair,`);
-            response.text = response.text.replace(regex, '\n**' + prompt + '**\n\n');
+            response.text = response.text.replace(regex, '');
             response.text = response.text.replace(regex,"");
             //response.text = response.text.replace('\n\n',"");
             response.text = response.text.replace(`<<${botName} Image📷  = `,"");

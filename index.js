@@ -440,10 +440,10 @@ async function main() {
     console.log("User        : " + message.author.tag);
     console.log("Question    : " + message.content);
   
-    let sentMessage;
-    if (dmCheck) {
-      sentMessage = await message.channel.send("I'm thinking sweetie 🤔");
-    }
+    //let sentMessage;
+    //if (dmCheck) {
+     // sentMessage = await message.channel.send("I'm thinking sweetie 🤔");
+   // }
   
     try {
       let interaction = {
@@ -471,7 +471,7 @@ async function main() {
             const prompt = '(beautiful photo, masterpiece),' + response.text.match(regex)[1].replace(botName,`1 girl, ${botInfo.meta.attributes.find((attr) => attr.trait_type==='eyes').value} eyes, ${botInfo.meta.attributes.find((attr) => attr.trait_type==='bust').value} breasts, ${botInfo.meta.attributes.find((attr) => attr.trait_type==='hair').value} hair,`);
             response.text = response.text.replace(regex, '');
             response.text = response.text.replace(regex,"");
-            //response.text = response.text.replace('\n\n',"");
+            response.text = response.text.replace('\n\n',"");
             response.text = response.text.replace(`<<${botName} Image📷  = `,"");
             response.text = response.text.replace(`<<OpenJourney API Image📷 =`,"");
             console.log(prompt);
@@ -531,9 +531,9 @@ async function main() {
         }
 
         if (!response.text) {
-          if (response.length >= process.env.DISCORD_MAX_RESPONSE_LENGTH && dmcheck) {
+          if (response.length >= process.env.DISCORD_MAX_RESPONSE_LENGTH && dmCheck) {
             splitAndSendChannelResponse(response, message.channel)
-          }  else if (response.length >= process.env.DISCORD_MAX_RESPONSE_LENGTH && !dmcheck) {
+          }  else if (response.length >= process.env.DISCORD_MAX_RESPONSE_LENGTH && !dmCheck) {
             await message.channel.send("The Answer Is Too Powerful 🤯,\nCheck Your DM 😅");
                     splitAndSendResponse(response, message.author.tag);
              // splitAndSendChannelResponse(response, message.channel)
@@ -541,7 +541,7 @@ async function main() {
           
           else {
             if (dmCheck) {
-              await sentMessage.edit(`API Error ❌\n\`\`\`\n${response}\n\`\`\`\n`)
+              await message.channel.send(`API Error ❌\n\`\`\`\n${response}\n\`\`\`\n`)
             } else {
               await message.channel.send(`API Error ❌\n\`\`\`\n${response}\n\`\`\`\n`);
             }
@@ -559,7 +559,7 @@ async function main() {
         } 
         else {
           if (dmCheck) {
-            await sentMessage.edit(response.text)
+            await message.channel.send(response.text);
           } else {
             await message.channel.send(response.text);
           }
@@ -1101,7 +1101,7 @@ try {
 
 
     const systemPrompt = botJobs + process.env.PROMPT_TEXT;
-    const customPrompt = `Current mood is ${mood}. ` +  systemPrompt.replace(/\[NAME\]/g, botName);
+    const customPrompt = `Your current mood is ${mood}. ` +  systemPrompt.replace(/\[NAME\]/g, botName);
 
       const extraPrompt = `You are <@${botuser}> in the discord server. People will tag you with <@${botuser}> as that's your name there and you will respond. Examples: user: Hi <@${botuser}> ! Assistant: Hello <@${interaction.user.id}>, I hope you are having a wonderful day.\n `;
       const userinfo = `Current user is named <@${interaction.user.id}> with the discord tag <@${interaction.user.id}> `;

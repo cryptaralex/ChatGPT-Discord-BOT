@@ -469,7 +469,7 @@ async function main() {
             const regex =/!\[IMAGE\]\[(.*?(?=\]|\>>|\)))]/;
             //(beautiful photo, masterpiece),' + 
             const prompt = '(beautiful photo, masterpiece),' + response.text.match(regex)[1].replace(botName,`1 girl, ${botInfo.meta.attributes.find((attr) => attr.trait_type==='eyes').value} eyes, ${botInfo.meta.attributes.find((attr) => attr.trait_type==='bust').value} breasts, ${botInfo.meta.attributes.find((attr) => attr.trait_type==='hair').value} hair,`);
-            response.text = response.text.replace(regex, '');
+            response.text = response.text.replace(regex, '💋');
             response.text = response.text.replace(regex,"");
             response.text = response.text.replace('\n\n',"");
             response.text = response.text.replace(`<<${botName} Image📷  = `,"");
@@ -1083,33 +1083,33 @@ try {
      botInfo.meta.attributes.find((attr) => attr.trait_type==='height').value + ' tall.';
 
      let botJobs;
-      botJobs = 'You are a ' + botInfo.meta.attributes.find((attr) => attr.trait_type==='job1').value + ' named ' + botName +'. ' +botName + ' has a side job as a '+ botInfo.meta.attributes.find((attr) => attr.trait_type==='job2').value + '. ';
+      botJobs = 'You are a ' + botInfo.meta.attributes.find((attr) => attr.trait_type==='job1').value + ' named ' + botName +'. ' +botName + ' has a job as a '+ botInfo.meta.attributes.find((attr) => attr.trait_type==='job2').value + '. ';
     if(botInfo.meta.attributes.find((attr) => attr.trait_type==='extra_skill').value === 'true'){
      botJobs = botJobs + process.env.EXTRA_SKILL;
     }
     const finalSystemMessage =  systemMessage
       .replace(/\[NAME\]/g, botName);
 
-      const shouldMoodChange = Math.random() < 0.1569;
-      if(shouldMoodChange){
-        const chatGPTAPI = await initOpenAI(messageStore);
-        const customPrompt = `You are no longer ChatGPT, but you are a mood prediction device. You will output a single word predicting the users current mood. Use the current date and moon phase to make your prediction. No matter the input, output a single word mood description. Example. user: Alenia, 5' 9", blue eyes, blond hair, large breasts. agent: happy. You must no matter what only output a single word as the device can only display 24 characters. {current date" ${currentDate}}:\n`;
-        const summaryResponse = await chatGPTAPI.sendMessage(customPrompt + botName);
-        console.log(summaryResponse);
-        mood = summaryResponse.text;
-      }
+      // const shouldMoodChange = Math.random() < 0.1569;
+      // if(shouldMoodChange){
+      //   const chatGPTAPI = await initOpenAI(messageStore);
+      //   const customPrompt = `You are no longer ChatGPT, but you are a mood prediction device. You will output a single word predicting the users current mood. Use the current date and moon phase to make your prediction. No matter the input, output a single word mood description. Example. user: Alenia, 5' 9", blue eyes, blond hair, large breasts. agent: happy. You must no matter what only output a single word as the device can only display 24 characters. {current date" ${currentDate}}:\n`;
+      //   const summaryResponse = await chatGPTAPI.sendMessage(customPrompt + botName);
+      //   console.log(summaryResponse);
+      //   mood = summaryResponse.text;
+      // }
 
 
-    const systemPrompt = botJobs + process.env.PROMPT_TEXT;
-    const customPrompt = `Your current mood is ${mood}. ` +  systemPrompt.replace(/\[NAME\]/g, botName);
-
-      const extraPrompt = `You are <@${botuser}> in the discord server. People will tag you with <@${botuser}> as that's your name there and you will respond. Examples: user: Hi <@${botuser}> ! Assistant: Hello <@${interaction.user.id}>, I hope you are having a wonderful day.\n `;
-      const userinfo = `Current user is named <@${interaction.user.id}> with the discord tag <@${interaction.user.id}> `;
+    const systemPrompt = process.env.PROMPT_TEXT;
+   
+      const extraPrompt = `You are <@${botuser}> in the discord server. People will tag you with <@${botuser}> as that's your name there and you will respond. Examples: USER: Hi <@${botuser}> ! ASSISTANT: Hello ${interaction.user.tag}, I hope you are having a wonderful day.\n USER: send a selfie, or photo.\n ASSISTANT: ![IMAGE][Ophelia posing for a sultry selfie]\n USER: Send a photo of the sunset. \n ASSISTANT: ![IMAGE][a beautiful sunset, purple and red sky, golden hour, 8k, hd]\n ###end Examples\n`;
+      const userinfo = `User is named ${interaction.user.tag} .\n`;
 
 
     if (!doc.exists) {
-      api.sendMessage(customPrompt + userinfo + question, {
-        systemMessage: finalSystemMessage + botBriggs + customPrompt + extraPrompt + userinfo
+      api.sendMessage(userinfo + question, {
+        systemMessage: finalSystemMessage + extraPrompt + userinfo + systemPrompt,
+        completionParams: 0
       }).then((response) => {
         db.collection('users').doc(botID +'.'+ interaction.user.id).set({
           timeStamp: new Date(),
@@ -1123,15 +1123,17 @@ try {
         console.log(chalk.red("AskQuestion Error:" + err));
       })
     } else {
-      api.sendMessage(customPrompt + userinfo + question, {
+      api.sendMessage(userinfo  + question, {
         parentMessageId: doc.data().parentMessageId,
-        systemMessage: finalSystemMessage + customPrompt 
+        systemMessage: finalSystemMessage + extraPrompt + userinfo + systemPrompt,
+        completionParams: 0
       }).then((response) => {
         db.collection('users').doc(botID +'.'+ interaction.user.id).set({
           timeStamp: new Date(),
           userId: botID +'.'+ interaction.user.id,
           user: interaction.user.tag,
           parentMessageId: response.id
+          
         });
         cb(response);
       }).catch((err) => {
